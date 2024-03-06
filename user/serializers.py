@@ -1,8 +1,8 @@
 from pyexpat import model
-from rest_framework.serializers import ModelSerializer
+from rest_framework import serializers
 from .models import CustomUser
 
-class CustomUserSerializer(ModelSerializer):
+class CustomUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
         fields = ["id", "first_name", "last_name", "email", "password"]
@@ -13,3 +13,12 @@ class CustomUserSerializer(ModelSerializer):
         # new user is created and with password hashing
         user = CustomUser.objects.create_user(**validated_data)
         return user
+    
+    def validate_password(self, value):
+        """
+        Check the validity of the password field on its own.
+        """
+        # Example: Check if password is too short
+        if len(value) < 6:
+            raise serializers.ValidationError("The password is too short.")
+        return value
