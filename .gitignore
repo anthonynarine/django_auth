@@ -5,7 +5,7 @@ __pycache__/
 
 # C extensions
 *.so
-
+ 
 auth_venv
 
 # Distribution / packaging
@@ -15,7 +15,7 @@ develop-eggs/
 dist/
 downloads/
 eggs/
-.eggs/
+.egg
 lib/
 lib64/
 parts/
