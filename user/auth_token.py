@@ -5,7 +5,7 @@ def create_access_token(user_id):
     """
     Generates a JWT access token for a given user ID.
     
-    This access token is short-lived, expiring 30 seconds after its creation. It's intended for 
+    This access token expires ever 30 seconds after its creation. It's intended for 
     authentication in scenarios that require short-term access and high security.
     
     Args:

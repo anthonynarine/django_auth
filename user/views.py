@@ -3,10 +3,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import exceptions
 
-from .models import CustomUser
+from .auth_token import create_access_token, create_refresh_token
 from .serializers import CustomUserSerializer
-from user import serializers
+from django.contrib.auth import get_user_model
 
+User = get_user_model()
 
 class Register(APIView):
     def post(self, request):
@@ -22,18 +23,32 @@ class Register(APIView):
 
 class Login(APIView):
     def post(self, request):
-        email = request.data["email"]
-        password = request.data["password"]
+        email = request.data.get("email")
+        password = request.data.get("password")
         
-        user = CustomUser.objects.filter(email=email).first()
+        if not email or not password:
+            raise exceptions.AuthenticationFailed("Email and password are required")
+        
+        user = User.objects.filter(email=email).first()
         
         if user is None:
-            raise exceptions.AuthenticationFailed("Invalid credentials")
+            raise exceptions.AuthenticationFailed("Invalid email")
         
         if not user.check_password(password):
-            raise exceptions.AuthenticationFailed("Invalid Credentials")
+            raise exceptions.AuthenticationFailed("Invalid password")
         
-        serializer = CustomUserSerializer(user)
+        access_token = create_access_token(user.id)
+        refresh_token = create_refresh_token(user.id)  
         
-        return Response(serializer.data)
+        response = Response()
+        response.set_cookie(
+            key="refresh_token", 
+            value=refresh_token, 
+            httponly=True, 
+            secure=True, 
+            samesite='Strict'
+        )
+        response.data = {"access_token": access_token}
+        
+        return response
     
