@@ -27,12 +27,14 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     # 3rd party
     "rest_framework",
+    'corsheaders',
     # local
     "user", 
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    'corsheaders.middleware.CorsMiddleware',
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -103,13 +105,8 @@ USE_TZ = True
 
 
 
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.0/howto/static-files/
-
 STATIC_URL = "static/"
 
-# Default primary key field type
-# https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
@@ -118,8 +115,14 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 #..ADDED..
 AUTH_USER_MODEL = "user.CustomUser"
 
+#..ADDED..
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",  # Add the domains allowed to make requests here
+    "http://localhost:3001",  # Add the domains allowed to make requests here
+    # Add more origins as needed
+]
 
-
+CORS_ALLOW_CREDENTIALS = True  # Allows cookies
 
 
 #....ADDED

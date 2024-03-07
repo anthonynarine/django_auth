@@ -6,9 +6,17 @@ from rest_framework import exceptions
 from .auth_token import create_access_token, create_refresh_token
 from .serializers import CustomUserSerializer
 from django.contrib.auth import get_user_model
+import logging
 
 User = get_user_model()
 
+logger = logging.getLogger(__name__)
+
+# ANSI color codes for logger
+RED = '\033[91m'
+GREEN = '\033[92m'
+END = '\033[0m'
+    
 class Register(APIView):
     def post(self, request):
         data = request.data
@@ -18,7 +26,10 @@ class Register(APIView):
         
         serializer = CustomUserSerializer(data=data)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+        user = serializer.save()
+        
+        logger.info(f"{GREEN}New user registered: {user.email}{END}")
+        
         return Response(serializer.data)
 
 class Login(APIView):
@@ -39,6 +50,8 @@ class Login(APIView):
         
         access_token = create_access_token(user.id)
         refresh_token = create_refresh_token(user.id)  
+        
+        logger.info(f"{GREEN}Tokens created for user: {user.email}{END}")  
         
         response = Response()
         response.set_cookie(
