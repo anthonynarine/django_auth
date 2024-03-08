@@ -1,6 +1,46 @@
 import jwt
 from datetime import datetime, timedelta
+from rest_framework import exceptions
+from rest_framework.authentication import BaseAuthentication, get_authorization_header
+from django.contrib.auth import get_user_model
+from .serializers import CustomUserSerializer
+from rest_framework.response import Response
+import logging
 
+User = get_user_model()
+print(User)
+
+logger = logging.getLogger(__name__)
+# ANSI color codes for logger
+RED = '\033[91m'
+GREEN = '\033[92m'
+END = '\033[0m'
+
+class JWTAuthentication(BaseAuthentication):
+    def authenticate(self, request):
+        auth_header = get_authorization_header(request).decode("utf-8")
+        auth = auth_header.split()
+
+        if auth and len(auth) == 2 and auth[0].lower() == "bearer":
+            token = auth[1]
+            try:
+                user_id = decode_access_token(token)
+                user = User.objects.get(pk=user_id)
+                logger.info(f"{GREEN}user object accessed{END}")  
+                
+                return (user, token)
+            
+            except jwt.ExpiredSignatureError:
+                raise exceptions.AuthenticationFailed("Token has expired", code=401)
+            except jwt.InvalidTokenError:
+                raise exceptions.AuthenticationFailed("User not Found", code=401)
+            except User.DoesNotExist:
+                raise exceptions.AuthenticationFailed("User not found", code=401)
+            except Exception as e:
+                raise exceptions.AuthenticationFailed(f"Authentication Failed: {str(e)}")
+
+        return None
+        
 def create_access_token(user_id):
     """
     Generates a JWT access token for a given user ID.
@@ -32,6 +72,9 @@ def decode_access_token(token):
         raise jwt.ExpiredSignatureError("The token has expired.")
     except jwt.InvalidTokenError:
         raise jwt.InvalidTokenError("Invalid token.")
+    except Exception as e:
+        # A generic exception for a catch-all unexpected errors;
+        raise exceptions.AuthenticationFailed(f"Token cannot be decoded: {str(e)}")
 
 
 def create_refresh_token(user_id):

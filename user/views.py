@@ -1,10 +1,8 @@
-import email
+import jwt
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import exceptions
-from rest_framework.authentication import get_authorization_header
-
-from .auth_token import create_access_token, create_refresh_token, decode_access_token
+from .auth_token import create_access_token, create_refresh_token, JWTAuthentication
 from .serializers import CustomUserSerializer
 from django.contrib.auth import get_user_model
 import logging
@@ -68,12 +66,7 @@ class LoginAPIView(APIView):
         return response
     
 class UserAPIView(APIView):
-    def get(self, request):
-        auth = get_authorization_header(request).split()
-
-        if auth and len(auth) == 2:
-            token = auth[1].decode("utf-8")
-            id = decode_access_token(token)
-
-        return Response(auth)
+    authentication_classes = [JWTAuthentication]
     
+    def get(self, request):
+        return Response(CustomUserSerializer(request.user).data)
