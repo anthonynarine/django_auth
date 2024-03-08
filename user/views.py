@@ -2,7 +2,7 @@ import jwt
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import exceptions
-from .auth_token import create_access_token, create_refresh_token, JWTAuthentication
+from .auth_token import create_access_token, create_refresh_token, JWTAuthentication, decode_refresh_token
 from .serializers import CustomUserSerializer
 from django.contrib.auth import get_user_model
 import logging
@@ -52,6 +52,8 @@ class LoginAPIView(APIView):
         refresh_token = create_refresh_token(user.id)  
         
         logger.info(f"{GREEN}Tokens created for user: {user.email}{END}")  
+        logger.info(f"{GREEN}{access_token} {user.email}{END}")  
+        logger.info(f"{GREEN}{refresh_token} {user.email}{END}")  
         
         response = Response()
         response.set_cookie(
@@ -67,6 +69,15 @@ class LoginAPIView(APIView):
     
 class UserAPIView(APIView):
     authentication_classes = [JWTAuthentication]
-    
     def get(self, request):
         return Response(CustomUserSerializer(request.user).data)
+    
+class RefreshAPIView(APIView):
+    def post(self, request):
+        refresh_token = request.COOKIES.get("refresh_token")
+        user_id = decode_refresh_token(refresh_token)
+        access_token = create_access_token(user_id)
+        return Response({
+            "token": access_token
+        })
+    

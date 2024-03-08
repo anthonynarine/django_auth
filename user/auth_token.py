@@ -98,6 +98,19 @@ def create_refresh_token(user_id):
         "iat": datetime.utcnow()  # Token issue time
     }
     # Encoding the payload with a secret key and specifying HS256 as the algorithm
-    return jwt.encode(payload, "access_secret", algorithm="HS256")
+    return jwt.encode(payload, "refresh_secret", algorithm="HS256")
 
 
+def decode_refresh_token(token):
+    logger.info(f"Decoding refresh token: {token}") 
+    try:
+        payload = jwt.decode(token, "refresh_secret", algorithms="HS256")
+        return payload["user_id"]
+    except jwt.ExpiredSignatureError:
+        raise exceptions.AuthenticationFailed("The token has expired.")
+    except jwt.InvalidTokenError as e:
+        logger.error(f"Invalid Token Error: {e}")  # Log the error before raising the exception
+        raise exceptions.AuthenticationFailed("Invalid token.")
+    except Exception as e:
+        logger.error(f"Unexpected error decoding token: {e}")  # Log unexpected errors
+        raise exceptions.AuthenticationFailed(f"Token cannot be decoded: {str(e)}")
