@@ -23,6 +23,17 @@ def create_access_token(user_id):
     # Encoding the payload with a secret key and specifying HS256 as the algorithm
     return jwt.encode(payload, "access_secret", algorithm="HS256")
 
+def decode_access_token(token):
+    try:
+        payload = jwt.decode(token, "access_secret", algorithms=["HS256"])
+
+        return payload["user_id"]
+    except jwt.ExpiredSignatureError:
+        raise jwt.ExpiredSignatureError("The token has expired.")
+    except jwt.InvalidTokenError:
+        raise jwt.InvalidTokenError("Invalid token.")
+
+
 def create_refresh_token(user_id):
     """
     Generates a JWT refresh token for a given user ID.
@@ -45,3 +56,5 @@ def create_refresh_token(user_id):
     }
     # Encoding the payload with a secret key and specifying HS256 as the algorithm
     return jwt.encode(payload, "access_secret", algorithm="HS256")
+
+

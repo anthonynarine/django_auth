@@ -2,13 +2,15 @@ import email
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import exceptions
+from rest_framework.authentication import get_authorization_header
 
-from .auth_token import create_access_token, create_refresh_token
+from .auth_token import create_access_token, create_refresh_token, decode_access_token
 from .serializers import CustomUserSerializer
 from django.contrib.auth import get_user_model
 import logging
 
 User = get_user_model()
+print(User)
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +19,7 @@ RED = '\033[91m'
 GREEN = '\033[92m'
 END = '\033[0m'
     
-class Register(APIView):
+class RegisterAPIView(APIView):
     def post(self, request):
         data = request.data
         
@@ -32,7 +34,7 @@ class Register(APIView):
         
         return Response(serializer.data)
 
-class Login(APIView):
+class LoginAPIView(APIView):
     def post(self, request):
         email = request.data.get("email")
         password = request.data.get("password")
@@ -64,4 +66,14 @@ class Login(APIView):
         response.data = {"access_token": access_token}
         
         return response
+    
+class UserAPIView(APIView):
+    def get(self, request):
+        auth = get_authorization_header(request).split()
+
+        if auth and len(auth) == 2:
+            token = auth[1].decode("utf-8")
+            id = decode_access_token(token)
+
+        return Response(auth)
     
