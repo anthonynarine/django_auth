@@ -1,4 +1,5 @@
 
+from enum import unique
 from unittest.util import _MAX_LENGTH
 from django.db import models
 from django.contrib.auth.models import AbstractUser
@@ -6,11 +7,12 @@ from django.utils.translation import gettext_lazy as _
 from .manager import CustomUserManager
 from django.conf import settings
 
+
 class CustomUser(AbstractUser):
-    first_name = models.CharField(max_length=255)
-    last_name = models.CharField(max_length=255)
+    first_name = models.CharField(max_length=26)
+    last_name = models.CharField(max_length=26)
     email = models.EmailField(_("email address"), unique=True)
-    password = models.CharField(max_length=255)
+    password = models.CharField(max_length=26)
     username = None
     
     USERNAME_FIELD = "email"
@@ -25,7 +27,7 @@ class UserToken(models.Model):
         on_delete=models.CASCADE,
         help_text="The user to whom this token is assigned.")
     token = models.CharField(
-        max_length=255,
+        max_length=100,
         unique=True,
         help_text="The unique token string."
         )
@@ -48,6 +50,8 @@ class UserToken(models.Model):
         return f"{self.user}'s {self.token_type} token"
 
 
-
+class Reset(models.Model):
+    email = models.CharField(max_length=26)
+    token = models.CharField(max_length=100, unique=True)
     
     

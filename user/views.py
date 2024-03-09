@@ -1,10 +1,11 @@
-from pytz import utc
-import jwt
+import random
+import string
+from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import exceptions
 from datetime import datetime, timedelta
-from .models import UserToken
+from .models import UserToken, Reset
 from .auth_token import create_access_token, create_refresh_token, JWTAuthentication, decode_refresh_token
 from .serializers import CustomUserSerializer
 from django.contrib.auth import get_user_model
@@ -25,14 +26,21 @@ class RegisterAPIView(APIView):
     def post(self, request):
         data = request.data
         
-        if data["password"] != data["password_confirm"]:
-            raise exceptions.APIException("Passwords do not match!") 
+        password = data.get("password")
+        password_confirm = data.get("password_confirm")
+        
+        # Check if either password is missing
+        if password is None or password_confirm is None:
+            return Response({"error": "Password and password_confirmation are required "}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check if passwords match
+        if password != password_confirm:
+            return Response({"error": "Passwords do not match"}, status=status.HTTP_400_BAD_REQUEST)
         
         serializer = CustomUserSerializer(data=data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.save()
-        
-        logger.info(f"{GREEN}New user registered: {user.email}{END}")
+        if serializer.is_valid(raise_exception=True):
+            user = serializer.save()
+            logger.info(f"{GREEN}New user registered: {user.email}{END}")
         
         return Response(serializer.data)
 
@@ -58,10 +66,10 @@ class LoginAPIView(APIView):
         UserToken.objects.create(
             user_id= user.id,
             token= refresh_token,
-            expired_at= datetime.utcnow() + timedelta(days=7),
+            expired_at= timezone.now() + timedelta(days=7),
         )
         
-        
+        # Loggs for testing
         logger.info(f"{GREEN}Tokens created for user: {user.email}{END}")  
         logger.info(f"{GREEN}{access_token} {user.email}{END}")  
         logger.info(f"{GREEN}{refresh_token} {user.email}{END}")  
@@ -111,6 +119,26 @@ class LogoutAPIView(APIView):
         }
         
         return response
+
+class PasswordResetRequestView(APIView):
+    def post(self, request):
+        # Generate a random token
+        token = "".join(random.choice(string.ascii_lowercase + string.digits) for _ in range(10))
+        
+        # Retrieve email from the request data
+        email = request.data.get("email")
+        if not email:
+            return Response({"error": "Email field is required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Create a Reset Instace
+        Reset.objects.create(
+            email=email,
+            token=token
+        )
+        
+        return Response({
+            "message": "success", 
+        }, status=status.HTTP_200_OK)
         
         
     
