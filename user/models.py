@@ -4,6 +4,7 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.utils.translation import gettext_lazy as _
 from .manager import CustomUserManager
+from django.conf import settings
 
 class CustomUser(AbstractUser):
     first_name = models.CharField(max_length=255)
@@ -19,8 +20,34 @@ class CustomUser(AbstractUser):
     
     
 class UserToken(models.Model):
-    user_id = models.IntegerField()
-    token = models.CharField(max_length=255)
-    created_at = models.DateTimeField(auto_now_add=True)
-    expired_at = models.DateField()
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        help_text="The user to whom this token is assigned.")
+    token = models.CharField(
+        max_length=255,
+        unique=True,
+        help_text="The unique token string."
+        )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        help_text="The datetime when this token was created."
+        )
+    expired_at = models.DateField(help_text="The date when this token will expire."
+        )
+    is_revoked = models.BooleanField(
+        default=False,
+        help_text="Flag indicating whether the token has been manually revoked."
+        )
+    last_used_at = models.DateTimeField(
+        auto_now=True,
+        help_text="The last time this token was used."
+        )
+    
+    def __str__(self):
+        return f"{self.user}'s {self.token_type} token"
+
+
+
+    
     

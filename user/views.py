@@ -1,10 +1,14 @@
+from pytz import utc
 import jwt
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import exceptions
+from datetime import datetime, timedelta
+from .models import UserToken
 from .auth_token import create_access_token, create_refresh_token, JWTAuthentication, decode_refresh_token
 from .serializers import CustomUserSerializer
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 import logging
 
 User = get_user_model()
@@ -49,7 +53,14 @@ class LoginAPIView(APIView):
             raise exceptions.AuthenticationFailed("Invalid password")
         
         access_token = create_access_token(user.id)
-        refresh_token = create_refresh_token(user.id)  
+        refresh_token = create_refresh_token(user.id) 
+        
+        UserToken.objects.create(
+            user_id= user.id,
+            token= refresh_token,
+            expired_at= datetime.utcnow() + timedelta(days=7),
+        )
+        
         
         logger.info(f"{GREEN}Tokens created for user: {user.email}{END}")  
         logger.info(f"{GREEN}{access_token} {user.email}{END}")  
@@ -76,13 +87,23 @@ class RefreshAPIView(APIView):
     def post(self, request):
         refresh_token = request.COOKIES.get("refresh_token")
         user_id = decode_refresh_token(refresh_token)
+        if not UserToken.objects.filter(
+            user=user_id,
+            token=refresh_token,
+            expired_at__gt=timezone.now()
+        ).exists(): 
+            raise exceptions.AuthenticationFailed("unauthenticated")
+        
         access_token = create_access_token(user_id)
         return Response({
-            "token": access_token
+            "access token": access_token
         })
         
 class LogoutAPIView(APIView):
     def post(self, request):
+        refresh_token = request.COOKIES.get("refresh_token")
+        UserToken.objects.filter(token=refresh_token).delete()
+        
         response = Response()
         response.delete_cookie(key="refresh_token")
         response.data = {
