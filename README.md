@@ -1,4 +1,4 @@
-# django_auth
+# Django User Authentication
 Authenticate with Access &amp; Refresh Tokens, 2FA, Social Authentication with Google.
 
 # API Documentaion 
