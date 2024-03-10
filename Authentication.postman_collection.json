@@ -1,0 +1,185 @@
+{
+    "info": {
+        "_postman_id": "65da8e42-be1d-47aa-b4f8-a72b9c1078a9",
+        "name": "Authentication",
+        "description": "This 'Authentication' collection encompasses all endpoints related to managing user authentication and account operations within our application. It covers user registration, login processes, token refresh, user data access with a token, and account recovery options like password reset.",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "Register user",
+            "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"first_name\": \"John\",\n    \"last_name\": \"Doe\",\n    \"email\": \"john.doe@example.com\",\n    \"password\": \"password123\",\n    \"password_confirm\": \"password123\"\n}",
+                    "options": {
+                        "raw": {
+                            "language": "json"
+                        }
+                    }
+                },
+                "url": {
+                    "raw": "{{host}}/api/register/",
+                    "protocol": "http",
+                    "host": [
+                        "{{host}}"
+                    ],
+                    "path": [
+                        "api",
+                        "register",
+                        ""
+                    ]
+                },
+                "description": "Allows new users to create an account. Requires first name, last name, email, password, and password confirmation."
+            },
+            "response": []
+        },
+        {
+            "name": "Login_obtain_tokens",
+            "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"email\": \"john.doe@example.com\",\n    \"password\": \"password123\"\n}",
+                    "options": {
+                        "raw": {
+                            "language": "json"
+                        }
+                    }
+                },
+                "url": {
+                    "raw": "{{host}}/api/login/",
+                    "protocol": "http",
+                    "host": [
+                        "{{host}}"
+                    ],
+                    "path": [
+                        "api",
+                        "login",
+                        ""
+                    ]
+                },
+                "description": "Authenticates the user and returns authentication tokens (access and refresh tokens)."
+            },
+            "response": []
+        },
+        {
+            "name": "Access_user_data_w/_token",
+            "request": {
+                "method": "GET",
+                "header": [
+                    {
+                        "key": "Authorization",
+                        "value": "Bearer {{access_token}}",
+                        "type": "text"
+                    }
+                ],
+                "url": {
+                    "raw": "{{host}}/api/user/",
+                    "protocol": "http",
+                    "host": [
+                        "{{host}}"
+                    ],
+                    "path": [
+                        "api",
+                        "user",
+                        ""
+                    ]
+                },
+                "description": "Retrieves the authenticated user's profile information. Requires a valid access token."
+            },
+            "response": []
+        },
+        {
+            "name": "Refresh_Token",
+            "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                    "raw": "{{host}}/api/refresh/",
+                    "protocol": "http",
+                    "host": [
+                        "{{host}}"
+                    ],
+                    "path": [
+                        "api",
+                        "refresh",
+                        ""
+                    ]
+                },
+                "description": "Allows refreshing of the access token using a refresh token."
+            },
+            "response": []
+        },
+        {
+            "name": "Logout",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Authorization",
+                        "value": "Bearer {{access_token}}",
+                        "type": "text"
+                    }
+                ],
+                "url": {
+                    "raw": "{{host}}/api/logout/",
+                    "protocol": "http",
+                    "host": [
+                        "{{host}}"
+                    ],
+                    "path": [
+                        "api",
+                        "logout",
+                        ""
+                    ]
+                },
+                "description": "Logs out the user from the application by invalidating their current access token."
+            },
+            "response": []
+        },
+        {
+            "name": "Forgot_Password",
+            "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"email\": \"john.doe@example.com\"\n}",
+                    "options": {
+                        "raw": {
+                            "language": "json"
+                        }
+                    }
+                },
+                "url": {
+                    "raw": "{{host}}/api/forgot-password/",
+                    "protocol": "http",
+                    "host": [
+                        "{{host}}"
+                    ],
+                    "path": [
+                        "api",
+                        "forgot-password",
+                        ""
+                    ]
+                },
+                "description": "Initiates the password reset process for users who have forgotten their password."
+            },
+            "response": []
+        }
+    ],
+    "variable": [
+        {
+            "key": "host",
+            "value": "http://127.0.0.1:8000"
+        },
+        {
+            "key": "access_token",
+            "value": ""
+        }
+    ]
+}
