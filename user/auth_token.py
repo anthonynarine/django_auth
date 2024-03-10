@@ -1,11 +1,17 @@
-import jwt
+# Standard library imports
 from datetime import datetime, timedelta
+import logging
+
+# Third-party imports
+from django.contrib.auth import get_user_model
+import jwt
 from rest_framework import exceptions
 from rest_framework.authentication import BaseAuthentication, get_authorization_header
-from django.contrib.auth import get_user_model
-from .serializers import CustomUserSerializer
 from rest_framework.response import Response
-import logging
+
+# Local application/library specific imports
+from .serializers import CustomUserSerializer
+
 
 User = get_user_model()
 print(User)

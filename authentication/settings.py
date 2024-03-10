@@ -64,8 +64,6 @@ TEMPLATES = [
 WSGI_APPLICATION = "authentication.wsgi.application"
 
 
-# Database
-# https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
 DATABASES = {
     "default": {
@@ -75,8 +73,6 @@ DATABASES = {
 }
 
 
-# Password validation
-# https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -125,10 +121,34 @@ CORS_ALLOWED_ORIGINS = [
 # Added
 CORS_ALLOW_CREDENTIALS = True  # Allows cookies
 
+# Added
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'localhost'
 EMAIL_PORT = 1025
 EMAIL_USE_TLS = False
+
+# Added
+DEFAULT_FROM_EMAIL = 'noreply@yourdomain.com'
+
+
+# Added 
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [os.path.join(BASE_DIR, 'templates')],
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.debug',
+                'django.template.context_processors.request',  # Include this for admin sidebar
+                'django.contrib.auth.context_processors.auth',  # Include this for authentication
+                'django.contrib.messages.context_processors.messages',  # Include this for messages
+                # Add any other context processors you might be using
+            ],
+        },
+    },
+]
+
 
 
 #....ADDED

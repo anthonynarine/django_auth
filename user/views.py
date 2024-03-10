@@ -1,16 +1,26 @@
+# Standard library imports
+from datetime import datetime, timedelta
+import logging
 import random
 import string
-from rest_framework import status
+from urllib import request
+
+# Third-party imports
+from django.contrib.auth import get_user_model
+from django.contrib.sites.shortcuts import get_current_site
+from django.core.mail import EmailMultiAlternatives
+from django.template.loader import render_to_string
+from django.utils.html import strip_tags
+from django.utils import timezone
+from rest_framework import exceptions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework import exceptions
-from datetime import datetime, timedelta
+
+# Local application/library specific imports
+from .auth_token import create_access_token, create_refresh_token, decode_refresh_token, JWTAuthentication
 from .models import UserToken, Reset
-from .auth_token import create_access_token, create_refresh_token, JWTAuthentication, decode_refresh_token
 from .serializers import CustomUserSerializer
-from django.contrib.auth import get_user_model
-from django.utils import timezone
-import logging
+from django.conf import settings
 
 User = get_user_model()
 print(User)
@@ -131,13 +141,34 @@ class PasswordResetRequestView(APIView):
             return Response({"error": "Email field is required"}, status=status.HTTP_400_BAD_REQUEST)
         
         # Create a Reset Instace
-        Reset.objects.create(
-            email=email,
-            token=token
+        Reset.objects.create(email=email,token=token)
+        
+        # Dynamically get the domain of the current site
+        current_site = get_current_site(request)
+        secure_protocol = "https://" if request.is_secure() else "http://"
+        url = secure_protocol + current_site.domain + "/reset-password/" + token
+        
+        # Render the HTML email template
+        html_content = render_to_string("email/password_reset_email.html", {"reset_link": url})
+        text_content = strip_tags(html_content) # generates a plain text verson of the email for non HTML email clients
+        
+        email = EmailMultiAlternatives(
+            subject="Reset your password",
+            body=text_content,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=[email],
         )
+        email.attach_alternative(html_content, "text/html") # Attach the HTML version
+        try:
+            email.send()
+        except Exception as e:
+            logger.error(f"Failed to send password reset email: {e}")
+            return Response({
+                "error": "Failed to send password reset email"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
         return Response({
-            "message": "success", 
+            "message": "Password reset email sent.", 
         }, status=status.HTTP_200_OK)
         
         

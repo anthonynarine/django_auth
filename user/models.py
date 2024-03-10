@@ -1,12 +1,14 @@
-
+# Standard library imports
 from enum import unique
-from unittest.util import _MAX_LENGTH
-from django.db import models
-from django.contrib.auth.models import AbstractUser
-from django.utils.translation import gettext_lazy as _
-from .manager import CustomUserManager
-from django.conf import settings
 
+# Third-party imports
+from django.conf import settings
+from django.contrib.auth.models import AbstractUser
+from django.db import models
+from django.utils.translation import gettext_lazy as _
+
+# Local application/library specific imports
+from .manager import CustomUserManager
 
 class CustomUser(AbstractUser):
     first_name = models.CharField(max_length=26)
