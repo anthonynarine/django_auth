@@ -122,7 +122,13 @@ CORS_ALLOWED_ORIGINS = [
     # Add more origins as needed
 ]
 
+# Added
 CORS_ALLOW_CREDENTIALS = True  # Allows cookies
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'localhost'
+EMAIL_PORT = 1025
+EMAIL_USE_TLS = False
 
 
 #....ADDED
