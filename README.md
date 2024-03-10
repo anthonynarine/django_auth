@@ -5,6 +5,7 @@ Authenticate with Access &amp; Refresh Tokens, 2FA, Social Authentication with G
 https://documenter.getpostman.com/view/23868442/2sA2xh3tTu
 
 
+# Application Overview
 The application provides user registration, login, password reset, and JWT token authentication functionalities. It utilizes Django's user model, custom user model extensions, JWT for token management, and Django Rest Framework for creating API endpoints.
 
 ### 1. Models
