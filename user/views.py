@@ -130,7 +130,7 @@ class LogoutAPIView(APIView):
         
         return response
 
-class PasswordResetRequestView(APIView):
+class ForgotPasswordRequestView(APIView):
     def post(self, request):
         # Generate a random token
         token = "".join(random.choice(string.ascii_lowercase + string.digits) for _ in range(10))

@@ -150,7 +150,6 @@ TEMPLATES = [
 ]
 
 
-
 #....ADDED
 LOGGING = {
     'version': 1,
