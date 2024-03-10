@@ -2,6 +2,7 @@
 from datetime import datetime, timedelta
 import logging
 import random
+import stat
 import string
 from urllib import request
 
@@ -171,5 +172,43 @@ class ForgotPasswordRequestView(APIView):
             "message": "Password reset email sent.", 
         }, status=status.HTTP_200_OK)
         
+class ResetPasswordRequestView(APIView):
+    def post(self, request):
+        data = request.data
         
-    
+        # Data needded from request
+        password = data.get("password")
+        password_confirm = data.get("password_confirm")
+        token = data.get("token")
+        
+        # Check any field is missing
+        if not all([password, password_confirm, token]):
+            return Response({
+                "error": "Password, Password confirmation, and token are required"
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check if passwords match
+        if password != password_confirm:
+            return Response({"error": "Passwords do not match"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Attempt to retrieve the reset record using the token
+        reset_password = Reset.objects.filter(token=token).first() 
+        
+        if not reset_password:
+            raise exceptions.APIException("Invalid link")
+        
+        user = User.objects.filter(email=reset_password.email).first()
+        
+        if not user:
+            raise exceptions.APIException("User not found")
+        
+        # Set the new password and save the user
+        user.set_password(data['password'])
+        user.save()
+        
+        # Delete the reset token to prevent reuse
+        reset_password.delete()
+        
+        return Response({
+            "message": "Password updated"
+        }, status=status.HTTP_202_ACCEPTED)

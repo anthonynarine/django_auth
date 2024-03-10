@@ -34,7 +34,40 @@
                 },
                 "description": "Allows new users to create an account. Requires first name, last name, email, password, and password confirmation."
             },
-            "response": []
+            "response": [
+                {
+                    "name": "Successful Registration",
+                    "originalRequest": {
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"first_name\": \"John\",\n    \"last_name\": \"Doe\",\n    \"email\": \"john.doe@example.com\",\n    \"password\": \"password123\",\n    \"password_confirm\": \"password123\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{host}}/api/register/",
+                            "protocol": "http",
+                            "host": [
+                                "{{host}}"
+                            ],
+                            "path": [
+                                "api",
+                                "register",
+                                ""
+                            ]
+                        }
+                    },
+                    "status": "Created",
+                    "code": 201,
+                    "header": [],
+                    "body": "{\n    \"message\": \"User registered successfully. Please log in.\"\n}"
+                }
+            ]
         },
         {
             "name": "Login_obtain_tokens",
@@ -64,7 +97,22 @@
                 },
                 "description": "Authenticates the user and returns authentication tokens (access and refresh tokens)."
             },
-            "response": []
+            "response": [
+                {
+                    "name": "Successful Login",
+                    "originalRequest": {
+                        "method": "POST",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"email\": \"john.doe@example.com\",\n    \"password\": \"password123\"\n}"
+                        }
+                    },
+                    "status": "OK",
+                    "code": 200,
+                    "header": [],
+                    "body": "{\n    \"access_token\": \"example-access-token\",\n    \"refresh_token\": \"example-refresh-token\"\n}"
+                }
+            ]
         },
         {
             "name": "Access_user_data_w/_token",
@@ -91,7 +139,18 @@
                 },
                 "description": "Retrieves the authenticated user's profile information. Requires a valid access token."
             },
-            "response": []
+            "response": [
+                {
+                    "name": "User Data",
+                    "originalRequest": {
+                        "method": "GET"
+                    },
+                    "status": "OK",
+                    "code": 200,
+                    "header": [],
+                    "body": "{\n    \"email\": \"john.doe@example.com\",\n    \"first_name\": \"John\",\n    \"last_name\": \"Doe\"\n}"
+                }
+            ]
         },
         {
             "name": "Refresh_Token",
@@ -112,7 +171,18 @@
                 },
                 "description": "Allows refreshing of the access token using a refresh token."
             },
-            "response": []
+            "response": [
+                {
+                    "name": "Token Refreshed",
+                    "originalRequest": {
+                        "method": "POST"
+                    },
+                    "status": "OK",
+                    "code": 200,
+                    "header": [],
+                    "body": "{\n    \"access_token\": \"new-example-access-token\"\n}"
+                }
+            ]
         },
         {
             "name": "Logout",
@@ -139,7 +209,18 @@
                 },
                 "description": "Logs out the user from the application by invalidating their current access token."
             },
-            "response": []
+            "response": [
+                {
+                    "name": "Successful Logout",
+                    "originalRequest": {
+                        "method": "POST"
+                    },
+                    "status": "OK",
+                    "code": 200,
+                    "header": [],
+                    "body": "{\n    \"message\": \"User logged out successfully.\"\n}"
+                }
+            ]
         },
         {
             "name": "Forgot_Password",
@@ -169,7 +250,18 @@
                 },
                 "description": "Initiates the password reset process for users who have forgotten their password."
             },
-            "response": []
+            "response": [
+                {
+                    "name": "Password Reset Email Sent",
+                    "originalRequest": {
+                        "method": "POST"
+                    },
+                    "status": "OK",
+                    "code": 200,
+                    "header": [],
+                    "body": "{\n    \"message\": \"Password reset email sent. Check your inbox.\"\n}"
+                }
+            ]
         }
     ],
     "variable": [
