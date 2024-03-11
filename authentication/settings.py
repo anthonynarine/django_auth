@@ -139,15 +139,14 @@ CORS_ALLOWED_ORIGINS = [
 #Add
 CORS_ALLOW_CREDENTIALS = True  # Allows cookies
 
-#Add
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'localhost'
-EMAIL_PORT = 1025
-EMAIL_USE_TLS = False
+# #Add for mailhog
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_HOST = 'localhost'
+# EMAIL_PORT = 1025
+# EMAIL_USE_TLS = False
 
 #Add
-DEFAULT_FROM_EMAIL = 'noreply@yourdomain.com'
-
+DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL")
 
 
 #Add
@@ -194,5 +193,5 @@ LOGGING = {
     },
 }
 
-
+#ADD
 django_heroku.settings(locals())

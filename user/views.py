@@ -1,10 +1,9 @@
 # Standard library imports
-from datetime import datetime, timedelta
+from datetime import timedelta
 import logging
-import random
-import stat
-import string
+import os
 from urllib import request
+from decouple import config
 
 # Third-party imports
 from django.contrib.auth import get_user_model
@@ -17,10 +16,13 @@ from django.utils import timezone
 from rest_framework import exceptions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes, force_str
 from django.shortcuts import get_object_or_404
 
+# Sendgrid email
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
 
 # Local application/library specific imports
 from .auth_token import create_access_token, create_refresh_token, decode_refresh_token, JWTAuthentication
@@ -161,15 +163,19 @@ class ForgotPasswordRequestView(APIView):
         html_content = render_to_string("email/password_reset_email.html", {"reset_link": url})
         text_content = strip_tags(html_content) # generates a plain text verson of the email for non HTML email clients
         
-        email = EmailMultiAlternatives(
-            subject="Reset your password",
-            body=text_content,
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            to=[email],
-        )
-        email.attach_alternative(html_content, "text/html") # Attach the HTML version
         try:
-            email.send()
+            sg= SendGridAPIClient(config("SENDGRID_API_KEY"))
+            from_email = settings.DEFAULT_FROM_EMAIL
+            to_email = email
+            subject = "Reset Your password"
+            content = Mail(
+                from_email=from_email,
+                to_emails=to_email,
+                subject=subject,
+                html_content=html_content
+            )
+            response = sg.send(content)
+            logger.info(f"Password reset email sent to {to_email}: {response.status_code}")
         except Exception as e:
             logger.error(f"Failed to send password reset email: {e}")
             return Response({
