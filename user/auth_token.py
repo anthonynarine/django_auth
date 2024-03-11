@@ -9,17 +9,16 @@ from django.contrib.auth import get_user_model
 import jwt
 from rest_framework import exceptions
 from rest_framework.authentication import BaseAuthentication, get_authorization_header
-from dotenv import load_dotenv
+from decouple import config
 
 # Local application/library specific imports
 from .serializers import CustomUserSerializer
 
-
 User = get_user_model()
 
-load_dotenv()
-JWT_ACCESS_SECRET = os.environ.get('JWT_ACCESS_SECRET')
-JWT_REFRESH_SECRET = os.environ.get('JWT_REFRESH_SECRET')
+# Get the JWT secrets using config
+JWT_ACCESS_SECRET = config('JWT_ACCESS_SECRET')
+JWT_REFRESH_SECRET = config('JWT_REFRESH_SECRET')
 
 logger = logging.getLogger(__name__)
 # ANSI color codes for logger

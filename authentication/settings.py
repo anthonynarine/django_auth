@@ -1,17 +1,16 @@
 
 from pathlib import Path
+from decouple import config
 import os, sys
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-from dotenv import load_dotenv
-load_dotenv()
-SECRET_KEY = os.environ.get('SECRET_KEY')
+SECRET_KEY = config('SECRET_KEY')
+DEBUG = config('DEBUG', default=False, cast=bool)
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
 
 ALLOWED_HOSTS = []
 
@@ -64,11 +63,15 @@ TEMPLATES = [
 WSGI_APPLICATION = "authentication.wsgi.application"
 
 
-
+#ADD
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': config('POSTGRESQL_DB_NAME'),
+        'USER': config('POSTGRESQL_DB_USER'),
+        'PASSWORD': config('POSTGRESQL_DB_PASSWORD'),
+        'HOST': config('POSTGRESQL_DB_HOST', default='localhost'),
+        'PORT': config('POSTGRESQL_DB_PORT', default=5432, cast=int),
     }
 }
 
@@ -151,8 +154,9 @@ TEMPLATES = [
 
 
 #Add
-JWT_ACCESS_SECRET = os.environ.get('JWT_ACCESS_SECRET')
-JWT_REFRESH_SECRET = os.environ.get('JWT_REFRESH_SECRET')
+# Get the JWT secrets using config
+JWT_ACCESS_SECRET = config('JWT_ACCESS_SECRET')
+JWT_REFRESH_SECRET = config('JWT_REFRESH_SECRET')
 
 #Add
 # Check if the JWT secrets are set
