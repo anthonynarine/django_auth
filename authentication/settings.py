@@ -1,6 +1,6 @@
 
 from pathlib import Path
-import os
+import os, sys
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -108,30 +108,30 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 
 
-#..ADDED..
+#ADD
 AUTH_USER_MODEL = "user.CustomUser"
 
-#..ADDED..
+#ADD.
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # Add the domains allowed to make requests here
     "http://localhost:3001",  # Add the domains allowed to make requests here
     # Add more origins as needed
 ]
 
-# Added
+#Add
 CORS_ALLOW_CREDENTIALS = True  # Allows cookies
 
-# Added
+#Add
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'localhost'
 EMAIL_PORT = 1025
 EMAIL_USE_TLS = False
 
-# Added
+#Add
 DEFAULT_FROM_EMAIL = 'noreply@yourdomain.com'
 
 
-# Added 
+#Add 
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -150,7 +150,18 @@ TEMPLATES = [
 ]
 
 
-#....ADDED
+#Add
+JWT_ACCESS_SECRET = os.environ.get('JWT_ACCESS_SECRET')
+JWT_REFRESH_SECRET = os.environ.get('JWT_REFRESH_SECRET')
+
+#Add
+# Check if the JWT secrets are set
+if not JWT_ACCESS_SECRET or not JWT_REFRESH_SECRET:
+    print('JWT secrets are not set. Application is shutting down.')
+    sys.exit(1)  # Exit the application with an error code
+
+
+#ADD
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -181,3 +192,5 @@ LOGGING = {
         },
     },
 }
+
+

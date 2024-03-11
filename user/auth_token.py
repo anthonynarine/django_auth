@@ -1,26 +1,32 @@
 # Standard library imports
 from datetime import datetime, timedelta
 import logging
+import os 
+
 
 # Third-party imports
 from django.contrib.auth import get_user_model
 import jwt
 from rest_framework import exceptions
 from rest_framework.authentication import BaseAuthentication, get_authorization_header
-from rest_framework.response import Response
+from dotenv import load_dotenv
 
 # Local application/library specific imports
 from .serializers import CustomUserSerializer
 
 
 User = get_user_model()
-print(User)
+
+load_dotenv()
+JWT_ACCESS_SECRET = os.environ.get('JWT_ACCESS_SECRET')
+JWT_REFRESH_SECRET = os.environ.get('JWT_REFRESH_SECRET')
 
 logger = logging.getLogger(__name__)
 # ANSI color codes for logger
 RED = '\033[91m'
 GREEN = '\033[92m'
 END = '\033[0m'
+
 
 class JWTAuthentication(BaseAuthentication):
     def authenticate(self, request):
@@ -67,11 +73,11 @@ def create_access_token(user_id):
         "iat": datetime.utcnow()  # Token issue time
     }
     # Encoding the payload with a secret key and specifying HS256 as the algorithm
-    return jwt.encode(payload, "access_secret", algorithm="HS256")
+    return jwt.encode(payload, JWT_ACCESS_SECRET, algorithm="HS256")
 
 def decode_access_token(token):
     try:
-        payload = jwt.decode(token, "access_secret", algorithms=["HS256"])
+        payload = jwt.decode(token, JWT_ACCESS_SECRET, algorithms=["HS256"])
 
         return payload["user_id"]
     except jwt.ExpiredSignatureError:
@@ -104,13 +110,13 @@ def create_refresh_token(user_id):
         "iat": datetime.utcnow()  # Token issue time
     }
     # Encoding the payload with a secret key and specifying HS256 as the algorithm
-    return jwt.encode(payload, "refresh_secret", algorithm="HS256")
+    return jwt.encode(payload, JWT_REFRESH_SECRET, algorithm="HS256")
 
 
 def decode_refresh_token(token):
-    logger.info(f"Decoding refresh token: {token}") 
+    logger.info(f"Decoding refresh token: {token}")  
     try:
-        payload = jwt.decode(token, "refresh_secret", algorithms="HS256")
+        payload = jwt.decode(token, JWT_REFRESH_SECRET, algorithms="HS256")
         return payload["user_id"]
     except jwt.ExpiredSignatureError:
         raise exceptions.AuthenticationFailed("The token has expired.")
@@ -120,3 +126,17 @@ def decode_refresh_token(token):
     except Exception as e:
         logger.error(f"Unexpected error decoding token: {e}")  # Log unexpected errors
         raise exceptions.AuthenticationFailed(f"Token cannot be decoded: {str(e)}")
+    
+    
+def create_reset_token(user_id):
+    """_summary_
+        Generate a secure token for password reset purposes. 
+        
+        This token should be short lived to ensure it's not miss used
+        
+        Args:
+            user_id: The unique id fo the use
+        
+        Returns:
+            A secure genereated reset token as a string. 
+    """

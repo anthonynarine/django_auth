@@ -9,6 +9,7 @@ from urllib import request
 # Third-party imports
 from django.contrib.auth import get_user_model
 from django.contrib.sites.shortcuts import get_current_site
+from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
@@ -16,6 +17,10 @@ from django.utils import timezone
 from rest_framework import exceptions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes, force_str
+from django.shortcuts import get_object_or_404
+
 
 # Local application/library specific imports
 from .auth_token import create_access_token, create_refresh_token, decode_refresh_token, JWTAuthentication
@@ -133,13 +138,15 @@ class LogoutAPIView(APIView):
 
 class ForgotPasswordRequestView(APIView):
     def post(self, request):
-        # Generate a random token
-        token = "".join(random.choice(string.ascii_lowercase + string.digits) for _ in range(10))
         
         # Retrieve email from the request data
         email = request.data.get("email")
         if not email:
             return Response({"error": "Email field is required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Generate a random token
+        user = User.objects.get(email=email)
+        token = PasswordResetTokenGenerator().make_token(user)
         
         # Create a Reset Instace
         Reset.objects.create(email=email,token=token)
@@ -147,7 +154,8 @@ class ForgotPasswordRequestView(APIView):
         # Dynamically get the domain of the current site
         current_site = get_current_site(request)
         secure_protocol = "https://" if request.is_secure() else "http://"
-        url = secure_protocol + current_site.domain + "/reset-password/" + token
+        url = secure_protocol + current_site.domain + "/reset-password/" + urlsafe_base64_encode(force_bytes(user.pk)) + '/' + token
+
         
         # Render the HTML email template
         html_content = render_to_string("email/password_reset_email.html", {"reset_link": url})
