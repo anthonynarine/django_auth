@@ -69,7 +69,7 @@ def create_access_token(user_id):
     # Payload of the token with user_id, expiration time, and issued at time.
     payload = {
         "user_id": user_id,  # Unique identifier for the user
-        "exp": datetime.utcnow() + timedelta(seconds=30),  # Token expiration time (30 seconds from now)
+        "exp": datetime.utcnow() + timedelta(minutes=10),  # Token expiration time (30 seconds from now)
         "iat": datetime.utcnow()  # Token issue time
     }
     # Encoding the payload with a secret key and specifying HS256 as the algorithm
@@ -128,15 +128,3 @@ def decode_refresh_token(token):
         raise exceptions.AuthenticationFailed(f"Token cannot be decoded: {str(e)}")
     
     
-def create_reset_token(user_id):
-    """_summary_
-        Generate a secure token for password reset purposes. 
-        
-        This token should be short lived to ensure it's not miss used
-        
-        Args:
-            user_id: The unique id fo the use
-        
-        Returns:
-            A secure genereated reset token as a string. 
-    """
