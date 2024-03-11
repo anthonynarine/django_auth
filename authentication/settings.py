@@ -2,6 +2,8 @@
 from pathlib import Path
 from decouple import config
 import os, sys
+import django_heroku
+import dj_database_url
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -33,6 +35,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     'corsheaders.middleware.CorsMiddleware',
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -44,17 +47,20 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = "authentication.urls"
 
+
+#Updated
 TEMPLATES = [
     {
-        "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
-        "APP_DIRS": True,
-        "OPTIONS": {
-            "context_processors": [
-                "django.template.context_processors.debug",
-                "django.template.context_processors.request",
-                "django.contrib.auth.context_processors.auth",
-                "django.contrib.messages.context_processors.messages",
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [os.path.join(BASE_DIR, 'templates')],
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.debug',
+                'django.template.context_processors.request',  # Include this for admin sidebar
+                'django.contrib.auth.context_processors.auth',  # Include this for authentication
+                'django.contrib.messages.context_processors.messages',  # Include this for messages
+                # Add any other context processors you might be using
             ],
         },
     },
@@ -63,18 +69,22 @@ TEMPLATES = [
 WSGI_APPLICATION = "authentication.wsgi.application"
 
 
-#ADD
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('POSTGRESQL_DB_NAME'),
-        'USER': config('POSTGRESQL_DB_USER'),
-        'PASSWORD': config('POSTGRESQL_DB_PASSWORD'),
-        'HOST': config('POSTGRESQL_DB_HOST', default='localhost'),
-        'PORT': config('POSTGRESQL_DB_PORT', default=5432, cast=int),
-    }
-}
+# ADD
+# DATABASES = {
+#     'default': {
+        
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': config('POSTGRESQL_DB_NAME'),
+#         'USER': config('POSTGRESQL_DB_USER'),
+#         'PASSWORD': config('POSTGRESQL_DB_PASSWORD'),
+#         'HOST': config('POSTGRESQL_DB_HOST', default='localhost'),
+#         'PORT': config('POSTGRESQL_DB_PORT', default=5432, cast=int),
+#     }
+# }
 
+DATABASES = {
+    'default': dj_database_url.config(default=os.environ.get('DATABASE_URL'))
+}
 
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -104,7 +114,12 @@ USE_TZ = True
 
 
 
-STATIC_URL = "static/"
+STATIC_URL = '/static/'
+
+#add
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
 
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -133,24 +148,6 @@ EMAIL_USE_TLS = False
 #Add
 DEFAULT_FROM_EMAIL = 'noreply@yourdomain.com'
 
-
-#Add 
-TEMPLATES = [
-    {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [os.path.join(BASE_DIR, 'templates')],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.debug',
-                'django.template.context_processors.request',  # Include this for admin sidebar
-                'django.contrib.auth.context_processors.auth',  # Include this for authentication
-                'django.contrib.messages.context_processors.messages',  # Include this for messages
-                # Add any other context processors you might be using
-            ],
-        },
-    },
-]
 
 
 #Add
@@ -198,3 +195,4 @@ LOGGING = {
 }
 
 
+django_heroku.settings(locals())
