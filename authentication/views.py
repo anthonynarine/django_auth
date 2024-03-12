@@ -1,4 +1,4 @@
 from django.http import HttpResponse
 
 def home(request):
-    return HttpResponse("Welcome to my Django app on Heroku!")
+    return HttpResponse("surprise mother fucker")
