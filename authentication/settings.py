@@ -14,7 +14,9 @@ SECRET_KEY = config('SECRET_KEY')
 DEBUG = config('DEBUG', default=False, cast=bool)
 
 
-ALLOWED_HOSTS = []
+
+ALLOWED_HOSTS = ['ant-django-auth-62cf01255868.herokuapp.com', 'localhost', '127.0.0.1']
+
 
 
 # Application definition
