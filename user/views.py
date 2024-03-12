@@ -42,8 +42,6 @@ GREEN = '\033[92m'
 END = '\033[0m'
 
 
-def Home(request):
-    return HttpResponse("Welcome to my Django app on Heroku!")
     
 class RegisterAPIView(APIView):
     def post(self, request):
