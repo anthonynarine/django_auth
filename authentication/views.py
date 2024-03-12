@@ -1,4 +1,4 @@
-from django.http import HttpResponse
+from django.http import HttpResponseRedirect
 
-def home(request):
-    return HttpResponse("surprise mother fucker")
+def redirect_to_docs(request):
+    return HttpResponseRedirect('https://documenter.getpostman.com/view/23868442/2sA2xh3tTu')
