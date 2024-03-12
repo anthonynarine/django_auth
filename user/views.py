@@ -28,6 +28,7 @@ from sendgrid.helpers.mail import Mail
 from .auth_token import create_access_token, create_refresh_token, decode_refresh_token, JWTAuthentication
 from .models import UserToken, Reset
 from .serializers import CustomUserSerializer
+from django.http import HttpResponse
 from django.conf import settings
 
 User = get_user_model()
@@ -39,6 +40,10 @@ logger = logging.getLogger(__name__)
 RED = '\033[91m'
 GREEN = '\033[92m'
 END = '\033[0m'
+
+
+def Home(request):
+    return HttpResponse("Welcome to my Django app on Heroku!")
     
 class RegisterAPIView(APIView):
     def post(self, request):
