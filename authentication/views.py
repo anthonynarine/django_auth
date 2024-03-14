@@ -1,6 +1,7 @@
 from django.http import HttpResponse
 from django.http import HttpResponseRedirect
 from django.shortcuts import render
+from templates import home
 
 # def home(request):
 #     return HttpResponse("SURPRISE MOTHER FUCKER")
@@ -10,6 +11,6 @@ from django.shortcuts import render
 
 
 def home(request):
-    return render(request, "api_documentation.html")
+    return render(request, "home.html")
 
 
