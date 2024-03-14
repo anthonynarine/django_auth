@@ -29,7 +29,7 @@ class UserToken(models.Model):
         on_delete=models.CASCADE,
         help_text="The user to whom this token is assigned.")
     token = models.CharField(
-        max_length=100,
+        max_length=512,
         unique=True,
         help_text="The unique token string."
         )
@@ -53,7 +53,11 @@ class UserToken(models.Model):
 
 
 class Reset(models.Model):
-    email = models.CharField(max_length=26)
-    token = models.CharField(max_length=100, unique=True)
+    email = models.CharField(max_length=100)
+    token = models.CharField(
+        max_length=512,
+        unique=True,
+        help_text="The unique token string."
+    )
     
     
