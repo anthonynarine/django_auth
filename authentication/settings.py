@@ -11,7 +11,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Security settings
 SECRET_KEY = config('SECRET_KEY')
 DEBUG = config('DEBUG', default=True, cast=bool)
-ALLOWED_HOSTS = ['ant-django-auth-62cf01255868.herokuapp.com', 'localhost', '127.0.0.1']
+ALLOWED_HOSTS = ['ant-django-auth-62cf01255868.herokuapp.com', 'localhost', '127.0.0.1', "localhost:3000"]
 
 
 # Application definition
@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     
     # Your apps
     "user",
+    "mail"
 ]
 
 MIDDLEWARE = [

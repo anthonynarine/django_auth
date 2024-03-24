@@ -7,6 +7,7 @@ from decouple import config
 
 # Third-party imports
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.sites.shortcuts import get_current_site
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.core.mail import EmailMultiAlternatives
@@ -19,6 +20,7 @@ from rest_framework.views import APIView
 from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes, force_str
 from django.shortcuts import get_object_or_404
+from rest_framework.permissions import AllowAny
 
 # Sendgrid email
 from sendgrid import SendGridAPIClient
@@ -142,6 +144,8 @@ class LogoutAPIView(APIView):
         return response
 
 class ForgotPasswordRequestView(APIView):
+    permission_classes = [AllowAny]
+    
     def post(self, request):
         
         # Retrieve email from the request data
@@ -149,8 +153,12 @@ class ForgotPasswordRequestView(APIView):
         if not email:
             return Response({"error": "Email field is required"}, status=status.HTTP_400_BAD_REQUEST)
         
+        try:
+            user = User.objects.get(email=email)
+        except ObjectDoesNotExist:
+            return Response({"message": "If the email is registered with us, you will receive a password reset link shortly."},
+                            status=status.HTTP_200_OK)
         # Generate a random token
-        user = User.objects.get(email=email)
         token = PasswordResetTokenGenerator().make_token(user)
         
         # Create a Reset Instace
@@ -179,6 +187,7 @@ class ForgotPasswordRequestView(APIView):
             )
             response = sg.send(content)
             logger.info(f"Password reset email sent to {to_email}: {response.status_code}")
+            logger.info(f"SendGrid response body: {response.body}")  # Additional logging
         except Exception as e:
             logger.error(f"Failed to send password reset email: {e}")
             return Response({
