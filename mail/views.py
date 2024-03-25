@@ -1,7 +1,4 @@
-import stat
-from urllib import response
 from decouple import config
-from email import message
 from django.conf import settings
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -12,7 +9,7 @@ from rest_framework import status
 class SendEmailAPIView(APIView):
     def post(self, request, *args, **kwargs):
         email_data = request.data
-        message = Mail(
+        email_message = Mail(
             from_email=email_data.get("from_email"),
             to_emails=email_data.get("to_email"),
             subject=email_data.get("subject"),
@@ -20,7 +17,10 @@ class SendEmailAPIView(APIView):
         )
         try:
             sg = SendGridAPIClient(config("SENDGRID_API_KEY"))
-            response = sg.send(message)
+            sg_response = sg.send(email_message)
+            print("SendGrid response status:", sg_response.status_code)  # Debugging
+            print("SendGrid response body:", sg_response.body)  # Debugging
             return Response({"message": "Email sent successfully"}, status=status.HTTP_200_OK)
         except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            print("Error sending email:", e)
+            return Response({"error": "Error sending email: " + str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
