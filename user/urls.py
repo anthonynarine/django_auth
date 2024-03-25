@@ -15,6 +15,6 @@ urlpatterns = [
     path("user/", UserAPIView.as_view(), name="user"),
     path("token-refresh/", RefreshAPIView.as_view(), name="refresh"),
     path("logout/", LogoutAPIView.as_view(), name="logout"),
-    path("forgot-password/", ForgotPasswordRequestView.as_view(), name="reset_password"),
-    path("reset-password/<uidb64>/<token>/", ResetPasswordRequestView.as_view(), name="password_reset_confirm"),
+    path("forgot-password/", ForgotPasswordRequestView.as_view(), name="forgot_password"),
+    path("reset-password/", ResetPasswordRequestView.as_view(), name="reset_password")
 ]

@@ -165,13 +165,12 @@ class ForgotPasswordRequestView(APIView):
         Reset.objects.create(email=email,token=token)
         
         # Dynamically get the domain of the current site
-        current_site = get_current_site(request)
-        secure_protocol = "https://" if request.is_secure() else "http://"
-        url = secure_protocol + current_site.domain + "/reset-password/" + urlsafe_base64_encode(force_bytes(user.pk)) + '/' + token
-
+        react_app_base_url = config("REACT_APP_BASE_URL_DEV") if settings.DEBUG else config("REACT_APP_BASE_URL_PROD")
+        uid_encoded = urlsafe_base64_encode(force_bytes(user.pk))
+        reset_link = f"{react_app_base_url}/reset-password/{uid_encoded}/{token}"
         
         # Render the HTML email template
-        html_content = render_to_string("email/password_reset_email.html", {"reset_link": url})
+        html_content = render_to_string("email/password_reset_email.html", {"reset_link": reset_link})
         text_content = strip_tags(html_content) # generates a plain text verson of the email for non HTML email clients
         
         try:
