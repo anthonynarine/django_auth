@@ -49,7 +49,7 @@ class UserToken(models.Model):
         )
     
     def __str__(self):
-        return f"{self.user}'s {self.token_type} token"
+        return f"{self.user}'s"
 
 
 class Reset(models.Model):
