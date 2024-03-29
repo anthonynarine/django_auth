@@ -230,6 +230,7 @@ class ResetPasswordRequestView(APIView):
         # Set the new password and save the user
         user.set_password(data['password'])
         user.save()
+
         
         # Delete the reset token to prevent reuse
         reset_password.delete()
