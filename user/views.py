@@ -9,9 +9,11 @@ from decouple import config
 # Third-party imports
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
+from django.core.validators import validate_email
 from django.contrib.sites.shortcuts import get_current_site
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.core.mail import EmailMultiAlternatives
+from django.forms import ValidationError
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from django.utils import timezone
@@ -48,30 +50,50 @@ END = '\033[0m'
 
     
 class RegisterAPIView(APIView):
+    """
+    API view for user registration.
+
+    Validates user input, normalizes email addresses, checks password confirmation,
+    and registers a new user if all validations pass.
+    """
+    
     def post(self, request):
-        data = request.data
+        """
+        Handle POST request to register a new user.
+
+        :param request: HttpRequest object containing user registration data
+        :return: Response object with the registration outcome
+        """
+        data = request.data.copy()  # Make a mutable copy of request data
         
         password = data.get("password")
         password_confirm = data.get("password_confirm")
         
         # Check if either password is missing
         if password is None or password_confirm is None:
-            return Response({"error": "Password and password_confirmation are required "}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Password and password_confirmation are required."}, status=status.HTTP_400_BAD_REQUEST)
         
         # Check if passwords match
         if password != password_confirm:
-            return Response({"error": "Passwords do not match"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Passwords do not match."}, status=status.HTTP_400_BAD_REQUEST)
         
-        # Prepate data for serialization, removing pw confirm; it is not part of the User model
-        data.pop("password_confirm: None")
+        # Normalize and validate email
+        try:
+            email = data.get("email", "").strip().lower()
+            validate_email(email)
+            data["email"] = email
+        except ValidationError:
+            return Response({"error": "Invalid email format."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Remove password_confirm from data as it's not part of the User model
+        data.pop("password_confirm", None)  # Fixed typo here; it was incorrectly formatted as "password_confirm: None"
         
         serializer = CustomUserSerializer(data=data)
         
-        
         if serializer.is_valid():
             user = serializer.save()
-            logger.info(f"{GREEN}New user registered: {user.email}{END}")
-        
+            logger.info(f"New user registered: {user.email}")  # Removed string formatting for logger variables for safety
+            
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
