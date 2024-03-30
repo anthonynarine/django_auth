@@ -16,6 +16,7 @@ class CustomUser(AbstractUser):
     email = models.EmailField(_("email address"), unique=True)
     password = models.CharField(max_length=100)
     username = None
+    tfa_secret = models.CharField(max_length=255, default='')
     
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []

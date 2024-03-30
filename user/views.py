@@ -1,5 +1,6 @@
 # Standard library imports
 from datetime import timedelta
+import email
 import logging
 import os
 from urllib import request
@@ -21,6 +22,7 @@ from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes, force_str
 from django.shortcuts import get_object_or_404
 from rest_framework.permissions import AllowAny
+import pyotp
 
 # Sendgrid email
 from sendgrid import SendGridAPIClient
@@ -60,54 +62,109 @@ class RegisterAPIView(APIView):
         if password != password_confirm:
             return Response({"error": "Passwords do not match"}, status=status.HTTP_400_BAD_REQUEST)
         
+        # Prepate data for serialization, removing pw confirm; it is not part of the User model
+        data.pop("password_confirm: None")
+        
         serializer = CustomUserSerializer(data=data)
-        if serializer.is_valid(raise_exception=True):
+        
+        
+        if serializer.is_valid():
             user = serializer.save()
             logger.info(f"{GREEN}New user registered: {user.email}{END}")
         
-        return Response(serializer.data)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class LoginAPIView(APIView):
     def post(self, request):
         email = request.data.get("email")
         password = request.data.get("password")
         
+        # Check if email and password are provided
         if not email or not password:
             raise exceptions.AuthenticationFailed("Email and password are required")
         
-        user = User.objects.filter(email=email).first()
-        
+        # Attempt to retrieve the user by email
+        user = User.objects.filter(email=email.lower()).first()
         if user is None:
             raise exceptions.AuthenticationFailed("Invalid email")
         
+        # Verify the password
         if not user.check_password(password):
             raise exceptions.AuthenticationFailed("Invalid password")
         
-        access_token = create_access_token(user.id)
-        refresh_token = create_refresh_token(user.id) 
+        # Check if 2FA is enabled for the user
+        if user.tfa_secret:
+            # If 2FA is enabled, indicate that the next step is required
+            return Response({
+                "message": "2FA required", "2fa_required": True}, status=status.HTTP_206_PARTIAL_CONTENT)
+        else:
+            # If 2FA is not enabled, proceed to generate tokens
+            access_token = create_access_token(user.id)
+            refresh_token = create_refresh_token(user.id)
+            
+            # Create a record for the refresh token
+            UserToken.objects.create(
+                user_id=user.id,
+                token=refresh_token,
+                expired_at=timezone.now() + timedelta(days=7),
+            )
+            
+            # Logging for debugging purposes
+            logger.info(f"Tokens created for user: {user.email}")
+            logger.info(f"Access Token: {access_token} for {user.email}")
+            logger.info(f"Refresh Token: {refresh_token} for {user.email}")
+            
+            # Set the refresh token in an HttpOnly cookie and return the access token
+            response = Response({"access_token": access_token}, status=status.HTTP_200_OK)
+            response.set_cookie(
+                key="refresh_token",
+                value=refresh_token,
+                httponly=True,
+                secure=True,
+                samesite='Strict'
+            )
+            return response
+    
+class TwoFactorAPIView(APIView):
+    def post(self, request):
+        email = request.data.get("email")
+        otp = request.data.get("otp")
         
-        UserToken.objects.create(
-            user_id= user.id,
-            token= refresh_token,
-            expired_at= timezone.now() + timedelta(days=7),
-        )
+        # Attempt to retrieve the user by email; maintain consistency in error messages
+        user = User.objects.filter(email=email).first()
+        if user is None or not user.tfa_secret:
+            # Instead of leaking info w/ get_user_or_404, use a generic error for all authentication failures 
+            raise exceptions.AuthenticationFailed("Authentication failed.")
         
-        # Loggs for testing
-        logger.info(f"{GREEN}Tokens created for user: {user.email}{END}")  
-        logger.info(f"{GREEN}{access_token} {user.email}{END}")  
-        logger.info(f"{GREEN}{refresh_token} {user.email}{END}")  
-        
-        response = Response()
-        response.set_cookie(
-            key="refresh_token", 
-            value=refresh_token, 
-            httponly=True, 
-            secure=True, 
-            samesite='Strict'
-        )
-        response.data = {"access_token": access_token}
-        
-        return response
+        # Verify otp
+        totp = pyotp.TOTP(user.tfa_secret)
+        if totp.verify(otp):
+            # OTP is correct, generate tokens
+            access_token = create_access_token(user.id)
+            refresh_token = create_refresh_token(user.id)
+            
+            # Create a record for the refresh token
+            UserToken.objects.create(
+                user_id=user.id,
+                token=refresh_token,
+                expired_at=timezone.now() + timedelta(days=7),
+            )
+            
+            # Return the tokens
+            response = Response()
+            response.set_cookie(
+                key="refresh_token",
+                value=refresh_token,
+                httponly=True,
+                secure=True,
+                samesite="Strict"
+            )
+            response.data = {"access_token": access_token}
+            return response
+        else:
+            raise exceptions.AuthenticationFailed("Authentication failed.")
     
 class UserAPIView(APIView):
     authentication_classes = [JWTAuthentication]
