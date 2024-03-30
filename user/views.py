@@ -196,11 +196,33 @@ class GenerateQRCodeAPIView(APIView):
 
         # Generate QR code
         qr_img = qrcode.make(totp_uri)
+        
+        # Save QR code to a buffer
         buf = BytesIO()
-        qr_img.save(buf)
+        qr_img.save(buf, format="PNG")
         buf.seek(0)
         
-        return Res
+        return HttpResponse(buf.getvalue(), content_type="image/png")
+    
+class Verify2FASetupAPIView(APIView):
+    """
+    Verifies the OTP provided by the user during the initial 2FA setup process
+    """
+    @method_decorator(login_required)
+    def post(self, request, *args, **kwargs):
+        user = request.user
+        otp_provided = request.data.get("otp")
+        
+        if not user.tfa_secret:
+            return Response({"error": "2FA is not set up."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        totp = pyotp.TOTP(user.tfa_secret)
+        if totp.verify(otp_provided):
+            user.is_2fa_enabled = True
+            user.save(update_fields=["is_2fa_enabled"])
+            return Response({"success": "2FA setup is complete"}, status=status.HTTP_200_OK)
+        else:
+            return Response({"error": "Invalid OTP. Please try again"}, status=status.HTTP_400_BAD_REQUEST)
     
 class UserAPIView(APIView):
     authentication_classes = [JWTAuthentication]
