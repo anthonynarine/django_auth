@@ -1,6 +1,7 @@
 # Standard library imports
 from datetime import timedelta
 import email
+from io import BytesIO
 import logging
 import os
 from urllib import request
@@ -8,6 +9,7 @@ from decouple import config
 
 # Third-party imports
 from django.contrib.auth import get_user_model
+from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.validators import validate_email
 from django.contrib.sites.shortcuts import get_current_site
@@ -17,6 +19,7 @@ from django.forms import ValidationError
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from django.utils import timezone
+from django.utils.decorators import method_decorator
 from rest_framework import exceptions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -25,6 +28,7 @@ from django.utils.encoding import force_bytes, force_str
 from django.shortcuts import get_object_or_404
 from rest_framework.permissions import AllowAny
 import pyotp
+import qrcode
 
 # Sendgrid email
 from sendgrid import SendGridAPIClient
@@ -92,101 +96,111 @@ class RegisterAPIView(APIView):
         
         if serializer.is_valid():
             user = serializer.save()
-            logger.info(f"New user registered: {user.email}")  # Removed string formatting for logger variables for safety
+            logger.info(f"New user registered: {user.email}")  
             
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class LoginAPIView(APIView):
+    """
+    Handles user login requests. If 2FA is enabled for the user, it requires an additional verification step.
+    """
+    
     def post(self, request):
-        email = request.data.get("email")
-        password = request.data.get("password")
+        """
+        Processes a login request. Validates the user's email and password. If 2FA is enabled for the user,
+        responds indicating that a second factor is required.
+        """
+        data = request.data.copy()
+        email = data.get("email", "").strip().lower()  # Normalize email to ensure case-insensitive comparison
+        password = data.get("password")
         
-        # Check if email and password are provided
+        # Validate presence of email and password
         if not email or not password:
             raise exceptions.AuthenticationFailed("Email and password are required")
         
-        # Attempt to retrieve the user by email
-        user = User.objects.filter(email=email.lower()).first()
+        # Retrieve user by normalized email
+        user = User.objects.filter(email=email).first()
         if user is None:
-            raise exceptions.AuthenticationFailed("Invalid email")
+            # For security, use a generic error message
+            raise exceptions.AuthenticationFailed("Invalid email or password")
         
-        # Verify the password
+        # Validate password
         if not user.check_password(password):
-            raise exceptions.AuthenticationFailed("Invalid password")
+            raise exceptions.AuthenticationFailed("Invalid email or password")
         
-        # Check if 2FA is enabled for the user
+        # Check for 2FA
         if user.tfa_secret:
-            # If 2FA is enabled, indicate that the next step is required
             return Response({
                 "message": "2FA required", "2fa_required": True}, status=status.HTTP_206_PARTIAL_CONTENT)
         else:
-            # If 2FA is not enabled, proceed to generate tokens
+            # Generate and return tokens for successful login
             access_token = create_access_token(user.id)
             refresh_token = create_refresh_token(user.id)
+            UserToken.objects.create(user_id=user.id, token=refresh_token, expired_at=timezone.now() + timedelta(days=7))
             
-            # Create a record for the refresh token
-            UserToken.objects.create(
-                user_id=user.id,
-                token=refresh_token,
-                expired_at=timezone.now() + timedelta(days=7),
-            )
-            
-            # Logging for debugging purposes
             logger.info(f"Tokens created for user: {user.email}")
-            logger.info(f"Access Token: {access_token} for {user.email}")
-            logger.info(f"Refresh Token: {refresh_token} for {user.email}")
-            
-            # Set the refresh token in an HttpOnly cookie and return the access token
             response = Response({"access_token": access_token}, status=status.HTTP_200_OK)
-            response.set_cookie(
-                key="refresh_token",
-                value=refresh_token,
-                httponly=True,
-                secure=True,
-                samesite='Strict'
-            )
+            response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=True, samesite='Strict')
             return response
     
 class TwoFactorAPIView(APIView):
+    
+    """
+    Handles the verification of the second factor for users with 2FA enabled.
+    """
+    
     def post(self, request):
-        email = request.data.get("email")
-        otp = request.data.get("otp")
+        """
+        Processes a 2FA verification request. Validates the OTP provided by the user against the user's tfa_secret.
+        If successful, generates access and refresh tokens.
+        """
+        data = request.data
+        email = data.get("email", "").strip().lower()  # email normalization
+        otp = data.get("otp")
         
-        # Attempt to retrieve the user by email; maintain consistency in error messages
+        # Retrieve the user and ensure 2FA is set up
         user = User.objects.filter(email=email).first()
         if user is None or not user.tfa_secret:
-            # Instead of leaking info w/ get_user_or_404, use a generic error for all authentication failures 
             raise exceptions.AuthenticationFailed("Authentication failed.")
         
-        # Verify otp
+        # Verify OTP
         totp = pyotp.TOTP(user.tfa_secret)
         if totp.verify(otp):
-            # OTP is correct, generate tokens
+            # OTP verification successful; proceed with generating tokens
             access_token = create_access_token(user.id)
             refresh_token = create_refresh_token(user.id)
+            UserToken.objects.create(user_id=user.id, token=refresh_token, expired_at=timezone.now() + timedelta(days=7))
             
-            # Create a record for the refresh token
-            UserToken.objects.create(
-                user_id=user.id,
-                token=refresh_token,
-                expired_at=timezone.now() + timedelta(days=7),
-            )
-            
-            # Return the tokens
-            response = Response()
-            response.set_cookie(
-                key="refresh_token",
-                value=refresh_token,
-                httponly=True,
-                secure=True,
-                samesite="Strict"
-            )
-            response.data = {"access_token": access_token}
+            response = Response({"access_token": access_token})
+            response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=True, samesite="Strict")
             return response
         else:
             raise exceptions.AuthenticationFailed("Authentication failed.")
+
+class GenerateQRCodeAPIView(APIView):
+    """
+    Generate a QR code for setting up 2FA with an authenticator app
+    """
+    @method_decorator(login_required)
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        if not user.tfa_secret:
+            user.tfa_secret = pyotp.random_base32()
+            user.save(update_fields=["tfa_secret"])
+
+        # Construct the providing URI
+        issuer_name = "Gait"
+        totp_uri = pyotp.totp.TOTP(user.tfa_secret).provisioning_uri(user.email, issuer_name=issuer_name)
+
+        # Generate QR code
+        qr_img = qrcode.make(totp_uri)
+        buf = BytesIO()
+        qr_img.save(buf)
+        buf.seek(0)
+        
+        return Res
     
 class UserAPIView(APIView):
     authentication_classes = [JWTAuthentication]
