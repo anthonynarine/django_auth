@@ -145,7 +145,7 @@ class LoginAPIView(APIView):
             response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=True, samesite='Strict')
             return response
     
-class TwoFactorAPIView(APIView):
+class TwoFactorLoginAPIView(APIView):
     
     """
     Handles the verification of the second factor for users with 2FA enabled.
