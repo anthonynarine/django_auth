@@ -54,50 +54,38 @@ END = '\033[0m'
 
     
 class RegisterAPIView(APIView):
-    """
-    API view for user registration.
-
-    Validates user input, normalizes email addresses, checks password confirmation,
-    and registers a new user if all validations pass.
-    """
-    
     def post(self, request):
-        """
-        Handle POST request to register a new user.
-
-        :param request: HttpRequest object containing user registration data
-        :return: Response object with the registration outcome
-        """
         data = request.data.copy()  # Make a mutable copy of request data
-        
-        password = data.get("password")
-        password_confirm = data.get("password_confirm")
-        
-        # Check if either password is missing
-        if password is None or password_confirm is None:
-            return Response({"error": "Password and password_confirmation are required."}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Check if passwords match
-        if password != password_confirm:
-            return Response({"error": "Passwords do not match."}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Normalize and validate email
+
+        # Validate and normalize email
         try:
             email = data.get("email", "").strip().lower()
             validate_email(email)
             data["email"] = email
         except ValidationError:
             return Response({"error": "Invalid email format."}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Remove password_confirm from data as it's not part of the User model
-        data.pop("password_confirm", None)  # Fixed typo here; it was incorrectly formatted as "password_confirm: None"
-        
+
+        # Extract and remove enable_2fa flag from data, if present
+        enable_2fa = data.pop('enable_2fa', False)
+
+        # Validation for passwords
+        password = data.get("password")
+        password_confirm = data.get("password_confirm")
+        if not password or not password_confirm:
+            return Response({"error": "Password and password confirmation are required."}, status=status.HTTP_400_BAD_REQUEST)
+        if password != password_confirm:
+            return Response({"error": "Passwords do not match."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Initialize the serializer with the modified data
         serializer = CustomUserSerializer(data=data)
-        
         if serializer.is_valid():
             user = serializer.save()
-            logger.info(f"New user registered: {user.email}")  
-            
+
+            # Manually update the is_2fa_enabled flag for the user if enable_2fa is True
+            if enable_2fa:
+                user.is_2fa_enabled = enable_2fa
+                user.save(update_fields=['is_2fa_enabled'])
+
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
