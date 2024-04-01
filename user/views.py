@@ -82,66 +82,38 @@ class RegisterAPIView(APIView):
         serializer = CustomUserSerializer(data=data)
         if serializer.is_valid():
             user = serializer.save()
-
-            # Manually update the is_2fa_enabled flag for the user if enable_2fa is True
-            if enable_2fa:
-                user.is_2fa_enabled = True
-                user.save(update_fields=['is_2fa_enabled'])
-
-                # Generate a temp_security_token(user)
-                temp_token = self.create_temporary_security_token(user)
                 
                 # Send the 2FA setup email
-                self.send_2fa_setup_email(user.email, temp_token)
+            self.send_welcome_email(user.email)
                 
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
-    def create_temporary_security_token(self, user):
-        token = jwt.encode(
-            {"user_id": user.pk, "exp": timezone.now() + timedelta(hours=24)}, 
-            config('JWT_ACCESS_SECRET'),
-            algorithm="HS256"  
-        )
-        
-        # Create a temporary token obj
-        temp_token = TemporarySecurityToken.objects.create(
-            user=user,
-            token=token,
-            expires_at=timezone.now() + timedelta(hours=1)
-            
-        )
-        return temp_token.token
-        
-
-    def send_2fa_setup_email(self, email, token):
+    def send_welcome_email(self, email,):
         try:
-            # Dynamically get the domain of the current site
-            react_app_base_url = settings.REACT_APP_BASE_URL
-            setup_link = f"{react_app_base_url}/2fa-setup/?token={token}"
             
-            # Render the HTML email template
-                    
-            # Render the HTML email template
-            html_content = render_to_string("email/2fa_setup_email.html", {"setup_link": setup_link})
+            html_content = render_to_string("welcome_email.html", {})
             text_content = strip_tags(html_content) # generates a plain text verson of the email for non HTML email clients
             
             sg= SendGridAPIClient(config("SENDGRID_API_KEY"))
             from_email = settings.DEFAULT_FROM_EMAIL
             to_email = email
-            subject = "Setup Two-Factor Authentication"
+            subject = "Thanks you for testing out this application"
+            
             content = Mail(
                 from_email=from_email,
                 to_emails=to_email,
                 subject=subject,
                 html_content=html_content
             )
+            content.plain_text_content = text_content
+            
             response = sg.send(content) 
-            logger.info(f"2FA setup email sent to {to_email}: {response.status_code}")
-            logger.info(f"SendGrid response body: {response.body}") 
+            logger.info(f"Welcome email sent to {to_email}: {response.status_code}")
+            logger.info(f"SendGrid response body: {response.body}")  
         except Exception as e:
-            logger.error(f"Failed to send 2FA setup email: {e}")
+            logger.error(f"Failed to send welcome email to {email}: {e}", exc_info=True)
         
         
 class LoginAPIView(APIView):
