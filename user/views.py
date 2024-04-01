@@ -1,5 +1,6 @@
 # Standard library imports
 from datetime import timedelta
+import datetime
 import email
 from io import BytesIO
 import logging
@@ -20,6 +21,7 @@ from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from django.utils import timezone
 from django.utils.decorators import method_decorator
+import jwt
 from rest_framework import exceptions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -35,8 +37,8 @@ from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 
 # Local application/library specific imports
-from .auth_token import create_access_token, create_refresh_token, decode_refresh_token, JWTAuthentication
-from .models import UserToken, Reset
+from .auth_token import JWT_ACCESS_SECRET, create_access_token, create_refresh_token, decode_refresh_token, JWTAuthentication
+from .models import TemporarySecurityToken, UserToken, Reset
 from .serializers import CustomUserSerializer
 from django.http import HttpResponse
 from django.conf import settings
@@ -83,12 +85,42 @@ class RegisterAPIView(APIView):
 
             # Manually update the is_2fa_enabled flag for the user if enable_2fa is True
             if enable_2fa:
-                user.is_2fa_enabled = enable_2fa
+                user.is_2fa_enabled = True
                 user.save(update_fields=['is_2fa_enabled'])
+
+                # Generate a temp_security_token(user)
+                temp_token = create_temporary_security_token(user)
 
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+    @classmethod
+    def create_temporary_security_token(cls, user):
+        token = jwt.encode(
+            {"user_id": user.pk, "exp": timezone.now() + timedelta(hours=24)}, 
+            JWT_ACCESS_SECRET,
+            algorithm="HS256"  
+        )
+        
+        # Create a temporary token obj
+        temp_token = TemporarySecurityToken.objects.create(
+            user=user,
+            token=token,
+            expires_at=timezone.now() + timedelta(hours=1)
+            
+        )
+        return temp_token.token
+        
+    @classmethod
+    def send_2fa_setup_email(cls, email, token):
+        try:
+            # Dynamically get the domain of the current site
+            react_app_base_url = settings.REACT_APP_BASE_URL_DEV if settings.DEBUG else settings.REACT_APP_BASE_URL_PROD
+            setup_link = f"{react_app_base_url}/2fa-setup/?token={token}"
+            
+        
+        
 
 class LoginAPIView(APIView):
     """
@@ -268,7 +300,7 @@ class ForgotPasswordRequestView(APIView):
         Reset.objects.create(email=email,token=token)
         
         # Dynamically get the domain of the current site
-        react_app_base_url = config("REACT_APP_BASE_URL_DEV") if settings.DEBUG else config("REACT_APP_BASE_URL_PROD")
+        react_app_base_url = settings.REACT_APP_BASE_URL
         uid_encoded = urlsafe_base64_encode(force_bytes(user.pk))
         reset_link = f"{react_app_base_url}/reset-password/{uid_encoded}/{token}"
         
