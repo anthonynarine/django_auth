@@ -34,7 +34,7 @@ class CustomUser(AbstractUser):
         help_text='Enter your last name.'
     )
     password = models.CharField(
-        max_length=100,
+        max_length=255,
         help_text='Enter a secure password.'
     )
     username = None  # Username is not used in this model.
@@ -102,7 +102,7 @@ class Reset(models.Model):
     Model for storing reset tokens for password reset functionality.
     """
     email = models.CharField(
-        max_length=100,
+        max_length=255,
         verbose_name='Email'
     )
     token = models.CharField(
@@ -125,7 +125,7 @@ class TemporarySecurityToken(models.Model):
         help_text=_('The user to whom this temporary token is associated.')
     )
     token = models.CharField(
-        max_length=100,
+        max_length=512,
         unique=True,
         verbose_name=_('Token'),
         help_text=_('A unique token string for temporary access or operations.')
