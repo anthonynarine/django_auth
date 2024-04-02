@@ -84,16 +84,16 @@ class RegisterAPIView(APIView):
             user = serializer.save()
                 
                 # Send the 2FA setup email
-            self.send_welcome_email(user.email)
+            self.send_thank_you_email(user.email)
                 
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
-    def send_welcome_email(self, email,):
+    def send_thank_you_email(self, email,):
         try:
             
-            html_content = render_to_string("welcome_email.html", {})
+            html_content = render_to_string("email/thank_you_email.html", {})
             text_content = strip_tags(html_content) # generates a plain text verson of the email for non HTML email clients
             
             sg= SendGridAPIClient(config("SENDGRID_API_KEY"))
@@ -145,7 +145,7 @@ class LoginAPIView(APIView):
             raise exceptions.AuthenticationFailed("Invalid email or password")
         
         # Check for 2FA
-        if user.tfa_secret:
+        if user.is_2fa_enabled:
             return Response({
                 "message": "2FA required", "2fa_required": True}, status=status.HTTP_206_PARTIAL_CONTENT)
         else:
@@ -367,3 +367,7 @@ class ResetPasswordRequestView(APIView):
         return Response({
             "message": "Password updated"
         }, status=status.HTTP_202_ACCEPTED)
+
+class CheckAuthState(APIView):
+    def get(self, request):
+        
