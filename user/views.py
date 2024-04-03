@@ -368,6 +368,6 @@ class ResetPasswordRequestView(APIView):
             "message": "Password updated"
         }, status=status.HTTP_202_ACCEPTED)
 
-class CheckAuthState(APIView):
-    def get(self, request):
+# class CheckAuthState(APIView):
+#     def get(self, request):
         
