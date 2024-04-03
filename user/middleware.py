@@ -11,6 +11,15 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 class TokenAuthenticationMiddleware(MiddlewareMixin):
+    
+    EXEMPT_PATHS = [
+        '/api/register/',
+        '/api/login/',
+        '/api/two-factor-login/',
+        '/api/forgot-password/',
+        '/api/reset-password/',
+    ]
+
     def __init__(self, get_response):
         self.get_response = get_response
 
