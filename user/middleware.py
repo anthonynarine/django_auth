@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 class TokenAuthenticationMiddleware(MiddlewareMixin):
-    
+
     EXEMPT_PATHS = [
         '/api/register/',
         '/api/login/',
@@ -24,6 +24,11 @@ class TokenAuthenticationMiddleware(MiddlewareMixin):
         self.get_response = get_response
 
     def __call__(self, request):
+        path = request.path_info.lstrip("/")
+        if any(path == exempt_path.lstrip("/") for exempt_path in self.EXEMPT_PATHS):
+            return self.get_response(request)
+
+        
         token = request.COOKIES.get("accessToken")
         if token:
             try:
