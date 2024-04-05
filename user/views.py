@@ -29,6 +29,7 @@ from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes, force_str
 from django.shortcuts import get_object_or_404
 from rest_framework.permissions import AllowAny
+from django.contrib.auth.models import AnonymousUser
 import pyotp
 import qrcode
 
@@ -240,7 +241,15 @@ class Verify2FASetupAPIView(APIView):
     
 class UserAPIView(APIView):
     authentication_classes = [JWTAuthentication]
+
     def get(self, request):
+        # Check if the request.user is an instance of AnonymousUser
+        if isinstance(request.user, AnonymousUser):
+            # If so, return a 401 Unauthorized response
+            return Response({"detail": "Authentication credentials were not provided or are invalid."}, 
+                            status=status.HTTP_401_UNAUTHORIZED)
+        
+        # If the user is authenticated, proceed to serialize and return the user data
         return Response(CustomUserSerializer(request.user).data)
     
 class RefreshAPIView(APIView):
