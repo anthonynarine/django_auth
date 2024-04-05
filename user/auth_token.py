@@ -1,5 +1,5 @@
 # Standard library imports
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 import os 
 
@@ -68,8 +68,8 @@ def create_access_token(user_id):
     # Payload of the token with user_id, expiration time, and issued at time.
     payload = {
         "user_id": user_id,  # Unique identifier for the user
-        "exp": datetime.utcnow() + timedelta(minutes=10),  # Token expiration time (30 seconds from now)
-        "iat": datetime.utcnow()  # Token issue time
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=10),  # Token expiration time (30 seconds from now)
+        "iat": datetime.now(timezone.utc)  # Token issue time
     }
     # Encoding the payload with a secret key and specifying HS256 as the algorithm
     return jwt.encode(payload, JWT_ACCESS_SECRET, algorithm="HS256")
@@ -105,8 +105,8 @@ def create_refresh_token(user_id):
     # Payload of the token with user_id, expiration time (7 days from now), and issued at time.
     payload = {
         "user_id": user_id,  # Unique identifier for the user
-        "exp": datetime.utcnow() + timedelta(days=7),  # Token expiration time (7 days from now)
-        "iat": datetime.utcnow()  # Token issue time
+        "exp": datetime.now(timezone.utc) + timedelta(days=7),  # Token expiration time (7 days from now)
+        "iat": datetime.now(timezone.utc)  # Token issue time
     }
     # Encoding the payload with a secret key and specifying HS256 as the algorithm
     return jwt.encode(payload, JWT_REFRESH_SECRET, algorithm="HS256")
