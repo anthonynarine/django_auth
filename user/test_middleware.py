@@ -51,6 +51,29 @@ class TokenAuthenticationMiddlewareTest(TestCase):
         # Stop the patching of the jwt.decode, restoring it to its original state.
         self.jwt_decode_patch.stop()
         
-    def test_exempt_path(self):
-        # Test the exempt paths bypass token checks
-        response = self.client.get(reverse(""))
+def test_exempt_path(self):
+    """
+    Test that the registration endpoint is exempt from token checks and
+    successfully registers a user with valid data, including password confirmation.
+    """
+    # Prepare registration data
+    registration_data = {
+        "email": "gohan@capsule.corp",
+        "first_name": "Son",
+        "last_name": "Gohan",
+        "password": "beastmode123",
+        "password_confirm": "beastmode123"  # Matching password for confirmation
+    }
+
+    # Use self.client.post to send a POST request to the registration endpoint
+    response = self.client.post(reverse("RegisterAPIView"), registration_data, content_type='application/json')
+
+    # Assert that the response status code is 201 (Created),
+    # indicating successful user registration
+    self.assertEqual(response.status_code, 201)
+    
+
+def
+
+        
+        
