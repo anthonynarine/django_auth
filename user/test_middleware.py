@@ -15,6 +15,9 @@ User = get_user_model()
 class TokenAuthenticationMiddlewareTest(TestCase):
     """
         Tests for the JWT Authentication Middleware in a Django application.
+        
+        This middleware will work in conjunction with the UserAPIView to serve 
+        as the endpoint for the session validation
 
         This test suite aims to verify the functionality of JWT token-based authentication
         within the application. It tests several key scenarios including:

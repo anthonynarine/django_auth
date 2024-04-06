@@ -239,7 +239,7 @@ class Verify2FASetupAPIView(APIView):
         else:
             return Response({"error": "Invalid OTP. Please try again"}, status=status.HTTP_400_BAD_REQUEST)
     
-class UserAPIView(APIView):
+class ValidateSessionAPIView(APIView):
     authentication_classes = [JWTAuthentication]
 
     def get(self, request):

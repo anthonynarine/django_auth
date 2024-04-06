@@ -10,6 +10,7 @@ import logging
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
+
 class TokenAuthenticationMiddleware(MiddlewareMixin):
     """
     Middleware for JWT token-based user authentication.
@@ -31,6 +32,7 @@ class TokenAuthenticationMiddleware(MiddlewareMixin):
         '/api/two-factor-login/',
         '/api/forgot-password/',
         '/api/reset-password/',
+        '/api/token-refresh/',
     ]
 
     def __init__(self, get_response):
@@ -75,7 +77,7 @@ class TokenAuthenticationMiddleware(MiddlewareMixin):
         if token:
             try:
                 # Decode the JWT token to validate and extract user information
-                payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+                payload = jwt.decode(token, settings.JWT_ACCESS_SECRET, algorithms=["HS256"])
                 user_id = payload.get("user_id")
                 # Fetch the user from the database and attatch to the request
                 request.user = User.objects.get(pk=user_id)

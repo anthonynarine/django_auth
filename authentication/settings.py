@@ -14,6 +14,7 @@ DEBUG = config('DEBUG', default=True, cast=bool)
 ALLOWED_HOSTS = ['ant-django-auth-62cf01255868.herokuapp.com', 'localhost', '127.0.0.1', "localhost:3000"]
 # Decide which React app base URL to use based on DEBUG
 REACT_APP_BASE_URL = config('REACT_APP_BASE_URL_DEV') if DEBUG else config('REACT_APP_BASE_URL_PROD')
+JWT_ACCESS_SECRET = config('JWT_ACCESS_SECRET', default='')
 
 # Application definition
 
@@ -43,6 +44,8 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    # 1st custom middleware!!!
+    "user.middleware.TokenAuthenticationMiddleware", 
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
