@@ -116,7 +116,6 @@ class RegisterAPIView(APIView):
         except Exception as e:
             logger.error(f"Failed to send welcome email to {email}: {e}", exc_info=True)
         
-        
 class LoginAPIView(APIView):
     """
     Handles user login requests. If 2FA is enabled for the user, it requires an additional verification step.
@@ -377,6 +376,33 @@ class ResetPasswordRequestView(APIView):
             "message": "Password updated"
         }, status=status.HTTP_202_ACCEPTED)
 
+class Toggle2FAAPIView(APIView):
+    """
+    Handles the PATCH request to toggle the "is_2fa_enabled" field of the user
+    
+    Expects:
+        request.datta: Dictionary containing "is_2fa_enabled" key with the boolean value
+        
+    Returns:
+        Response object with the new state of "is_2fa_enabled" or an error message
+    """
+    def patch(self, request):
+        # Check if the user is authenticated + middleware alread does this but i'll still keep this
+        user = request.user
+        if not user.is_authenticated:
+            return Response ({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        is_2fa_enabled = request.data.get("is_2fa_enabled")
+        if is_2fa_enabled is None:
+            return Response ({"error": "Missing"}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        user.is_2fa_enabled = is_2fa_enabled  
+        user.save(update_fields=["is_2fs_enabled"])
+        
+        return Response({"is_2fa_enabled": user.is_2fa_enabled})
 # class CheckAuthState(APIView):
 #     def get(self, request):
+
+
+
         

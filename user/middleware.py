@@ -2,6 +2,7 @@ from rest_framework import status
 from django.http import JsonResponse
 from django.utils.deprecation import MiddlewareMixin
 from django.contrib.auth import get_user_model
+from django.urls import resolve
 import jwt
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
@@ -21,6 +22,9 @@ class TokenAuthenticationMiddleware(MiddlewareMixin):
     token is valid, expired, or not present, it sets the request's user to 
     AnonomousUser indicating an unauthenticated or improperly authenticated request.
     
+    This middleware effectively decouples authentication logic from your views, making
+    your Django application more modular and easier to manage.
+    
     Certain endpoints that do not require authentication are exempted from token checks,
     allowing for unrestricted access to those paths. 
     """
@@ -33,6 +37,8 @@ class TokenAuthenticationMiddleware(MiddlewareMixin):
         '/api/forgot-password/',
         '/api/reset-password/',
         '/api/token-refresh/',
+        '/admin/',
+        
     ]
 
     def __init__(self, get_response):
@@ -67,8 +73,10 @@ class TokenAuthenticationMiddleware(MiddlewareMixin):
         # Normalize the request path to ensure consistency in the path matching
         path = request.path_info.lstrip("/")
         
+        # Use Django's resolve() function to match URLs by the name instead of hardcoding paths
+        resolved_path_name = resolve(request.path_info).url_name
         # Check if the request path iex exempt from the authentication
-        if any(path == exempt_path.lstrip("/") for exempt_path in self.EXEMPT_PATHS):
+        if any(path.startswith(exempt_path.lstrip("/")) for exempt_path in self.EXEMPT_PATHS) or resolved_path_name.startswith('admin:'):
             # Skip the authentication and proceed to the next layer for exempt paths
             return self.get_response(request)
 
