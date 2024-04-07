@@ -31,13 +31,15 @@ class TokenAuthenticationMiddleware(MiddlewareMixin):
 
     # Paths that have access without authentication
     EXEMPT_PATHS = [
+        '/admin/',
+        '/api/send-email/',
         '/api/register/',
         '/api/login/',
+        '/api/logout/',
         '/api/two-factor-login/',
         '/api/forgot-password/',
         '/api/reset-password/',
         '/api/token-refresh/',
-        '/admin/',
         
     ]
 
