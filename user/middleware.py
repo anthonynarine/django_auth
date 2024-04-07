@@ -91,6 +91,7 @@ class TokenAuthenticationMiddleware(MiddlewareMixin):
                 user_id = payload.get("user_id")
                 # Fetch the user from the database and attatch to the request
                 request.user = User.objects.get(pk=user_id)
+                logger.debug(f"User {user_id} authenticated successfully via JWT.")
             except jwt.ExpiredSignatureError:
                 # Handle expired tokens
                 logger.info("Expired token received.")

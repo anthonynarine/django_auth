@@ -30,6 +30,8 @@ from django.utils.encoding import force_bytes, force_str
 from django.shortcuts import get_object_or_404
 from rest_framework.permissions import AllowAny
 from django.contrib.auth.models import AnonymousUser
+from django.middleware.csrf import get_token
+
 import pyotp
 import qrcode
 
@@ -157,6 +159,11 @@ class LoginAPIView(APIView):
             logger.info(f"Tokens created for user: {user.email}")
             response = Response({"access_token": access_token}, status=status.HTTP_200_OK)
             response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=True, samesite='Strict')
+            
+            # Manually set the CSRF token cookie
+            csrf_token = get_token(request)
+            response.set_cookie("csrftoken", csrf_token, httponly=False, secure=True, samesite="Strict")
+        
             return response
     
 class TwoFactorLoginAPIView(APIView):
@@ -397,7 +404,7 @@ class Toggle2FAAPIView(APIView):
             return Response ({"error": "Missing"}, status=status.HTTP_401_UNAUTHORIZED)
         
         user.is_2fa_enabled = is_2fa_enabled  
-        user.save(update_fields=["is_2fs_enabled"])
+        user.save(update_fields=["is_2fa_enabled"])
         
         return Response({"is_2fa_enabled": user.is_2fa_enabled})
 # class CheckAuthState(APIView):
