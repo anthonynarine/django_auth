@@ -21,6 +21,7 @@ from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from django.utils import timezone
 from django.utils.decorators import method_decorator
+from django.db import transaction
 import jwt
 from rest_framework import exceptions, status
 from rest_framework.response import Response
@@ -160,11 +161,11 @@ class LoginAPIView(APIView):
             response = Response({"access_token": access_token}, status=status.HTTP_200_OK)
             response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=True, samesite='Strict')
             
-            # Manually set the CSRF token cookie
-            csrf_token = get_token(request)
-            response.set_cookie("csrftoken", csrf_token, httponly=False, secure=True, samesite="Strict")
-        
-            return response
+        # Manually set the CSRF token cookie
+        csrf_token = get_token(request)
+        response.set_cookie("csrftoken", csrf_token, httponly=False, secure=True, samesite="Strict")
+    
+        return response
     
 class TwoFactorLoginAPIView(APIView):
     
@@ -225,25 +226,6 @@ class GenerateQRCodeAPIView(APIView):
         
         return HttpResponse(buf.getvalue(), content_type="image/png")
     
-class Verify2FASetupAPIView(APIView):
-    """
-    Verifies the OTP provided by the user during the initial 2FA setup process
-    """
-    @method_decorator(login_required)
-    def post(self, request, *args, **kwargs):
-        user = request.user
-        otp_provided = request.data.get("otp")
-        
-        if not user.tfa_secret:
-            return Response({"error": "2FA is not set up."}, status=status.HTTP_400_BAD_REQUEST)
-        
-        totp = pyotp.TOTP(user.tfa_secret)
-        if totp.verify(otp_provided):
-            user.is_2fa_enabled = True
-            user.save(update_fields=["is_2fa_enabled"])
-            return Response({"success": "2FA setup is complete"}, status=status.HTTP_200_OK)
-        else:
-            return Response({"error": "Invalid OTP. Please try again"}, status=status.HTTP_400_BAD_REQUEST)
     
 class ValidateSessionAPIView(APIView):
     authentication_classes = [JWTAuthentication]
@@ -407,9 +389,30 @@ class Toggle2FAAPIView(APIView):
         user.save(update_fields=["is_2fa_enabled"])
         
         return Response({"is_2fa_enabled": user.is_2fa_enabled})
-# class CheckAuthState(APIView):
-#     def get(self, request):
 
+class Verify2FASetupAPIView(APIView):
+    """
+    Verifies the OTP provided by the user during the initial 2FA setup process
+    """
+    @method_decorator(login_required)
+    def post(self, request, *args, **kwargs):
+        user = request.user
+        otp_provided = request.data.get("otp")
+        
+        if not user.tfa_secret:
+            return Response({"error": "2FA is not set up."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        totp = pyotp.TOTP(user.tfa_secret)
+        
+        # wrapping the DB operation w/ transaction.atomic(), Django ensures that either all operations within
+        # the block are sucessfully committed to the db or none of them are. 
+        with transaction.atomic():
+            if totp.verify(otp_provided):
+                user.is_2fa_enabled = True
+                user.save(update_fields=["is_2fa_enabled"])
+                return Response({"success": "2FA setup is complete"}, status=status.HTTP_200_OK)
+            else:
+                return Response({"error": "Invalid OTP. Please try again"}, status=status.HTTP_400_BAD_REQUEST)
 
 
         
