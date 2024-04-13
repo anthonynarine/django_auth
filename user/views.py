@@ -60,7 +60,21 @@ END = '\033[0m'
 
     
 class RegisterAPIView(APIView):
+    
     def post(self, request):
+        """
+        Register a new user.
+
+        Validates the provided email, password, and password confirmation.
+        Optionally enables 2FA. (currently not in use)
+        Sends a thank you email upon successful registration.
+
+        Args:
+            request (Request): HTTP POST request containing user registration data.
+
+        Returns:
+            Response: HTTP response with user data and status code.
+        """
         data = request.data.copy()  # Make a mutable copy of request data
 
         # Validate and normalize email
