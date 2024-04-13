@@ -135,50 +135,71 @@ class RegisterAPIView(APIView):
         
 class LoginAPIView(APIView):
     """
-    Handles user login requests. If 2FA is enabled for the user, it requires an additional verification step.
+    API view to handle user login requests.
+
+    Validates user credentials and checks for two-factor authentication requirements.
+    On successful login, returns an access token and sets a secure cookie with a refresh token.
+
+    Attributes:
+        None
+
+    Methods:
+        post(request): Processes the POST request to log in a user.
     """
-    
+
     def post(self, request):
         """
-        Processes a login request. Validates the user's email and password. If 2FA is enabled for the user,
-        responds indicating that a second factor is required.
+        Handle POST request to authenticate a user.
+
+        Parameters:
+            request (HttpRequest): The request object containing the email and password.
+
+        Returns:
+            Response: Django REST Framework response object with either error message and status code
+                        or successful login data and tokens.
         """
         data = request.data.copy()
-        email = data.get("email", "").strip().lower()  # Normalize email to ensure case-insensitive comparison
+        email = data.get("email", "").strip().lower()  # Normalize email to ensure case-insensitive comparison.
         password = data.get("password")
         
-        # Validate presence of email and password
+        # Check if both email and password are provided.
         if not email or not password:
-            raise exceptions.AuthenticationFailed("Email and password are required")
+            logger.info("Login attempt failed: Missing email or password.")
+            return Response({'error': 'Email and password are required'}, status=status.HTTP_400_BAD_REQUEST)
         
-        # Retrieve user by normalized email
+        # Retrieve user by normalized email and verify password.
         user = User.objects.filter(email=email).first()
-        if user is None:
-            # For security, use a generic error message
-            raise exceptions.AuthenticationFailed("Invalid email or password")
+        if user is None or not user.check_password(password):
+            logger.info(f"Login attempt failed for {email}: Invalid credentials.")
+            return Response({'error': 'Invalid email or password'}, status=status.HTTP_401_UNAUTHORIZED)
         
-        # Validate password
-        if not user.check_password(password):
-            raise exceptions.AuthenticationFailed("Invalid email or password")
-        
-        # Check for 2FA
+        # If 2FA is enabled, require the second factor authentication.
         if user.is_2fa_enabled:
-            return Response({
-                "message": "2FA required", "2fa_required": True}, status=status.HTTP_206_PARTIAL_CONTENT)
-        else:
-            # Generate and return tokens for successful login
+            logger.info(f"2FA required for user {email}.")
+            return Response({'message': '2FA required', '2fa_required': True}, status=status.HTTP_206_PARTIAL_CONTENT)
+        
+        # Try to create access and refresh tokens if no exceptions are raised.
+        try:
             access_token = create_access_token(user.id)
             refresh_token = create_refresh_token(user.id)
-            UserToken.objects.create(user_id=user.id, token=refresh_token, expired_at=timezone.now() + timedelta(days=7))
-            
-            logger.info(f"Tokens created for user: {user.email}")
-            response = Response({"access_token": access_token}, status=status.HTTP_200_OK)
-            response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=True, samesite='Strict')
-            
-        # Manually set the CSRF token cookie
+            UserToken.objects.create(
+                user_id=user.id, 
+                token=refresh_token, 
+                expired_at=timezone.now() + timedelta(days=7) 
+            )
+        except Exception as e:
+            logger.error(f"Error creating tokens for {email}: {str(e)}")
+            return Response({'error': 'Unable to create tokens'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        # Prepare and send the successful response with the access token.
+        response = Response({"access_token": access_token}, status=status.HTTP_200_OK)
+        response.set_cookie("refresh_token", refresh_token, httponly=True, secure=True, samesite='Strict')
+        
+        # Set CSRF token in the cookie for additional security.
         csrf_token = get_token(request)
         response.set_cookie("csrftoken", csrf_token, httponly=False, secure=True, samesite="Strict")
-    
+        
+        logger.info(f"Successful login for {email}. Tokens created and sent.")
         return response
     
 class TwoFactorLoginAPIView(APIView):
