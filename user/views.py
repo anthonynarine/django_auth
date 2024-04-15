@@ -9,6 +9,7 @@ from urllib import request, response
 from decouple import config
 
 # Third-party imports
+from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist
@@ -95,7 +96,14 @@ class RegisterAPIView(APIView):
             return Response({"error": "Password and password confirmation are required."}, status=status.HTTP_400_BAD_REQUEST)
         if password != password_confirm:
             return Response({"error": "Passwords do not match."}, status=status.HTTP_400_BAD_REQUEST)
-
+        
+        # Validate the password against set policies
+        try:
+            validate_password(password)
+        except ValidationError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            
+        
         # Initialize the serializer with the modified data
         serializer = CustomUserSerializer(data=data)
         if serializer.is_valid():
@@ -378,7 +386,7 @@ class ResetPasswordRequestView(APIView):
         password_confirm = data.get("password_confirm")
         token = data.get("token")
         
-        # Check any field is missing
+        # VAlidate required fields
         if not all([password, password_confirm, token]):
             return Response({
                 "error": "Password, Password confirmation, and token are required"
@@ -388,24 +396,24 @@ class ResetPasswordRequestView(APIView):
         if password != password_confirm:
             return Response({"error": "Passwords do not match"}, status=status.HTTP_400_BAD_REQUEST)
         
-        # Attempt to retrieve the reset record using the token
-        reset_password = Reset.objects.filter(token=token).first() 
+        # Additional DRF PW validation
+        try:
+            validate_password(password)
+        except ValidationError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            
         
-        if not reset_password:
-            raise exceptions.APIException("Invalid link")
-        
-        user = User.objects.filter(email=reset_password.email).first()
-        
-        if not user:
-            raise exceptions.APIException("User not found")
-        
-        # Set the new password and save the user
-        user.set_password(data['password'])
-        user.save()
+        # Retrieve the reset record using the token
+        with transaction.atomic():
+            reset_password = get_object_or_404(Reset, token=token)
+            user = get_object_or_404(User, email=reset_password.email) 
 
+            # Set the new password and save the user
+            user.set_password(password)
+            user.save()
         
-        # Delete the reset token to prevent reuse
-        reset_password.delete()
+            # Delete the reset token to prevent reuse
+            reset_password.delete()
         
         return Response({
             "message": "Password updated"

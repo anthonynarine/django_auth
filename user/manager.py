@@ -1,22 +1,27 @@
 from django.contrib.auth.base_user import BaseUserManager
+from django.core.validators import validate_email
+from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
-
 
 class CustomUserManager(BaseUserManager):
     """
-    Custom user model manager where email is the unique identifiers
+    Custom user model manager where email is the unique identifier
     for authentication instead of usernames.
     """
-    def create_user(self, email, password, **extra_fields):
+    def create_user(self, email, password=None, **extra_fields):
         """
         Create and save a user with the given email and password.
         """
         if not email:
             raise ValueError(_("The Email must be set"))
+        try:
+            validate_email(email)
+        except ValidationError:
+            raise ValueError(_("Invalid email format"))
         email = self.normalize_email(email)
         user = self.model(email=email, **extra_fields)
         user.set_password(password)
-        user.save()
+        user.save(using=self._db)
         return user
 
     def create_superuser(self, email, password, **extra_fields):
@@ -32,3 +37,4 @@ class CustomUserManager(BaseUserManager):
         if extra_fields.get("is_superuser") is not True:
             raise ValueError(_("Superuser must have is_superuser=True."))
         return self.create_user(email, password, **extra_fields)
+
