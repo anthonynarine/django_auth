@@ -56,6 +56,7 @@ class TokenAuthenticationMiddleware(MiddlewareMixin):
         self.get_response = get_response
 
     def __call__(self, request):
+        logger.debug("TokenAuthenticationMiddleware: Processing request")
         """
         Process the request throught the middleware.
         

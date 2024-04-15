@@ -259,8 +259,7 @@ class GenerateQRCodeAPIView(APIView):
         qr_img.save(buf, format="PNG")
         buf.seek(0)
         
-        return HttpResponse(buf.getvalue(), content_type="image/png")
-    
+        return HttpResponse(buf.getvalue(), content_type="image/png") 
     
 class ValidateSessionAPIView(APIView):
     authentication_classes = [JWTAuthentication]
@@ -418,12 +417,13 @@ class Toggle2FAAPIView(APIView):
         
         is_2fa_enabled = request.data.get("is_2fa_enabled")
         if is_2fa_enabled is None:
-            return Response ({"error": "Missing"}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response({"error": "Missing 'is_2fa_enabled' parameter. Please specify if two-factor authentication should be enabled or disabled."}, status=status.HTTP_400_BAD_REQUEST)
         
         user.is_2fa_enabled = is_2fa_enabled  
         user.save(update_fields=["is_2fa_enabled"])
         
-        return Response({"is_2fa_enabled": user.is_2fa_enabled})
+        message = "Two-factor authentication has been enabled successfully." if is_2fa_enabled else "Two-factor authentication has been disabled successfully."
+        return Response({"message": message, "is_2fa_enabled": user.is_2fa_enabled}, status=status.HTTP_200_OK)
 
 class Verify2FASetupAPIView(APIView):
     """
