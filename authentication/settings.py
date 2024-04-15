@@ -187,7 +187,7 @@ AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
         'OPTIONS': {
-            'password_list_path': 'django/contrib/auth/common-passwords.txt.gz',
+            'password_list_path': 'D:/react-django/django_auth/auth_venv/Lib/site-packages/django/contrib/auth/common-passwords.txt.gz',
         },
     },
     {
