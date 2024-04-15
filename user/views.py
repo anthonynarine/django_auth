@@ -304,58 +304,70 @@ class LogoutAPIView(APIView):
         return response
 
 class ForgotPasswordRequestView(APIView):
+    """
+    API View for handling password reset requests.
+    Allows any user (authenticated or not) to request a password reset link.
+    """
     permission_classes = [AllowAny]
-    
+
     def post(self, request):
-        
-        # Retrieve email from the request data
+        """
+        Handles POST requests to send password reset emails.
+
+        Expects an email in the POST data and sends a password reset link to it if it's registered in the database.
+        The response is intentionally vague to prevent email enumeration attacks.
+
+        Args:
+            request (Request): The DRF request object containing POST data.
+
+        Returns:
+            Response: DRF Response object with either an error message or a success message.
+        """
         email = request.data.get("email")
         if not email:
+            # Return an error response if the email field is missing.
             return Response({"error": "Email field is required"}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         try:
             user = User.objects.get(email=email)
         except ObjectDoesNotExist:
+            # Do not reveal whether the email address exists to protect user privacy.
             return Response({"message": "If the email is registered with us, you will receive a password reset link shortly."},
                             status=status.HTTP_200_OK)
-        # Generate a random token
+
+        # Generate a secure token for the password reset process.
         token = PasswordResetTokenGenerator().make_token(user)
-        
-        # Create a Reset Instace
-        Reset.objects.create(email=email,token=token)
-        
-        # Dynamically get the domain of the current site
+
+        # Create a reset instance to track this request.
+        Reset.objects.create(email=email, token=token)
+
+        # Build the password reset link with the user ID encoded and token.
         react_app_base_url = settings.REACT_APP_BASE_URL
         uid_encoded = urlsafe_base64_encode(force_bytes(user.pk))
         reset_link = f"{react_app_base_url}/reset-password/{uid_encoded}/{token}"
-        
-        # Render the HTML email template
+
+        # Prepare HTML and plain text versions of the password reset email.
         html_content = render_to_string("email/password_reset_email.html", {"reset_link": reset_link})
-        text_content = strip_tags(html_content) # generates a plain text verson of the email for non HTML email clients
-        
+        text_content = strip_tags(html_content)  # Plain text version for email clients that do not support HTML.
+
         try:
-            sg= SendGridAPIClient(config("SENDGRID_API_KEY"))
+            # Setup and send the email through SendGrid.
+            sg = SendGridAPIClient(config("SENDGRID_API_KEY"))
             from_email = settings.DEFAULT_FROM_EMAIL
             to_email = email
-            subject = "Reset Your password"
-            content = Mail(
-                from_email=from_email,
-                to_emails=to_email,
-                subject=subject,
-                html_content=html_content
-            )
+            subject = "Reset Your Password"
+            content = Mail(from_email=from_email, to_emails=to_email, subject=subject, html_content=html_content)
             response = sg.send(content)
+            # Log the outcome of sending the email.
             logger.info(f"Password reset email sent to {to_email}: {response.status_code}")
-            logger.info(f"SendGrid response body: {response.body}")  # Additional logging
+            logger.info(f"SendGrid response body: {response.body}")
         except Exception as e:
+            # Log any failures with sending the email.
             logger.error(f"Failed to send password reset email: {e}")
-            return Response({
-                "error": "Failed to send password reset email"
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
-        return Response({
-            "message": "Password reset email sent.", 
-        }, status=status.HTTP_200_OK)
+            return Response({"error": "Failed to send password reset email"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        # Inform the requester that an email has been sent if applicable.
+        return Response({"message": "Password reset email sent."}, status=status.HTTP_200_OK)
         
 class ResetPasswordRequestView(APIView):
     def post(self, request):
@@ -422,9 +434,8 @@ class Toggle2FAAPIView(APIView):
         user.is_2fa_enabled = is_2fa_enabled  
         user.save(update_fields=["is_2fa_enabled"])
         
-        message = "Two-factor authentication has been enabled successfully." if is_2fa_enabled else "Two-factor authentication has been disabled successfully."
-        return Response({"message": message, "is_2fa_enabled": user.is_2fa_enabled}, status=status.HTTP_200_OK)
-
+        return Response({"is_2fa_enabled": user.is_2fa_enabled}, status=status.HTTP_200_OK)
+    
 class Verify2FASetupAPIView(APIView):
     """
     Verifies the OTP provided by the user during the initial 2FA setup process
