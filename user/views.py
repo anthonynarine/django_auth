@@ -23,6 +23,7 @@ from django.utils.html import strip_tags
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.db import transaction
+from django.db import IntegrityError
 import jwt
 from rest_framework import exceptions, status
 from rest_framework.response import Response
@@ -43,10 +44,12 @@ from sendgrid.helpers.mail import Mail
 
 # Local application/library specific imports
 from .auth_token import JWT_ACCESS_SECRET, create_access_token, create_refresh_token, decode_refresh_token, JWTAuthentication
-from .models import TemporarySecurityToken, UserToken, Reset
+from .models import CustomUser, TemporarySecurityToken, UserToken, Reset
 from .serializers import CustomUserSerializer
 from django.http import HttpResponse
 from django.conf import settings
+
+from user import serializers
 
 User = get_user_model()
 print(User)
@@ -61,13 +64,11 @@ END = '\033[0m'
 
     
 class RegisterAPIView(APIView):
-    
     def post(self, request):
         """
         Register a new user.
 
         Validates the provided email, password, and password confirmation.
-        Optionally enables 2FA. (currently not in use)
         Sends a thank you email upon successful registration.
 
         Args:
@@ -79,67 +80,63 @@ class RegisterAPIView(APIView):
         data = request.data.copy()  # Make a mutable copy of request data
 
         # Validate and normalize email
+        email = data.get("email", "").strip().lower()
+        if CustomUser.objects.filter(email=email).exists():
+            return Response({"error": {"email": "This email is already in use"}}, status=status.HTTP_400_BAD_REQUEST)
+        
         try:
-            email = data.get("email", "").strip().lower()
             validate_email(email)
             data["email"] = email
         except ValidationError:
-            return Response({"error": "Invalid email format."}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Extract and remove enable_2fa flag from data, if present
-        enable_2fa = data.pop('enable_2fa', False)
+            return Response({"error": {"email": "Invalid email format"}}, status=status.HTTP_400_BAD_REQUEST)
 
         # Validation for passwords
         password = data.get("password")
         password_confirm = data.get("password_confirm")
         if not password or not password_confirm:
-            return Response({"error": "Password and password confirmation are required."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": {"password": "Password and password confirmation are required"}}, status=status.HTTP_400_BAD_REQUEST)
         if password != password_confirm:
-            return Response({"error": "Passwords do not match."}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Validate the password against set policies
+            return Response({"error": {"password_confirm": "Passwords do not match"}}, status=status.HTTP_400_BAD_REQUEST)
+
         try:
             validate_password(password)
         except ValidationError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-            
-        
+            return Response({"error": {"password": str(e)}}, status=status.HTTP_400_BAD_REQUEST)
+
         # Initialize the serializer with the modified data
         serializer = CustomUserSerializer(data=data)
-        if serializer.is_valid():
-            user = serializer.save()
-                
-                # Send the 2FA setup email
-            self.send_thank_you_email(user.email)
-                
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
-    def send_thank_you_email(self, email,):
         try:
-            
+            serializer.is_valid(raise_exception=True)
+            user = serializer.save()
+            # Send the thank you email
+            self.send_thank_you_email(user.email)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        except serializers.ValidationError as e:
+            return Response({"error": e.get_full_details()}, status=status.HTTP_400_BAD_REQUEST)
+        except IntegrityError as e:
+            return Response({"error": {"non_field_error": "A database error occurred"}}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": {"non_field_error": "An unexpected error occurred"}}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def send_thank_you_email(self, email):
+        try:
             html_content = render_to_string("email/thank_you_email.html", {})
-            text_content = strip_tags(html_content) # generates a plain text verson of the email for non HTML email clients
+            text_content = strip_tags(html_content)
             
-            sg= SendGridAPIClient(config("SENDGRID_API_KEY"))
+            sg = SendGridAPIClient(config("SENDGRID_API_KEY"))
             from_email = settings.DEFAULT_FROM_EMAIL
             to_email = email
-            subject = "Thanks you for testing out this application"
+            subject = "Thank you for testing out this application"
             
-            content = Mail(
-                from_email=from_email,
-                to_emails=to_email,
-                subject=subject,
-                html_content=html_content
-            )
+            content = Mail(from_email=from_email, to_emails=to_email, subject=subject, html_content=html_content)
             content.plain_text_content = text_content
             
-            response = sg.send(content) 
+            response = sg.send(content)
             logger.info(f"Welcome email sent to {to_email}: {response.status_code}")
-            logger.info(f"SendGrid response body: {response.body}")  
+            logger.info(f"SendGrid response body: {response.body}")
         except Exception as e:
             logger.error(f"Failed to send welcome email to {email}: {e}", exc_info=True)
+
         
 class LoginAPIView(APIView):
     """
