@@ -1,3 +1,4 @@
+
 from pyexpat import model
 from rest_framework import serializers
 from .models import CustomUser
@@ -15,6 +16,14 @@ class CustomUserSerializer(serializers.ModelSerializer):
         user = CustomUser.objects.create_user(**validated_data)
         
         return user
+    
+    def validate_email(self, value):
+        """
+        Check if the email is already in use.
+        """    
+        if CustomUser.objects.filter(email=value).exists():
+            raise serializers.ValidationError("This email is already in use.")
+        return value
     
     def validate_password(self, value):
         """
