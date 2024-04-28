@@ -17,7 +17,7 @@ from django.core.validators import validate_email
 from django.contrib.sites.shortcuts import get_current_site
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.core.mail import EmailMultiAlternatives
-from django.forms import ValidationError
+from django.core.exceptions import ValidationError
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from django.utils import timezone
@@ -34,6 +34,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework.permissions import AllowAny
 from django.contrib.auth.models import AnonymousUser
 from django.middleware.csrf import get_token
+from rest_framework.exceptions import ValidationError as DRFValidationError
 
 import pyotp
 import qrcode
@@ -111,7 +112,7 @@ class RegisterAPIView(APIView):
             # Send the thank you email
             self.send_thank_you_email(user.email)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
-        except serializers.ValidationError as e:
+        except DRFValidationError as e:
             return Response({"error": e.get_full_details()}, status=status.HTTP_400_BAD_REQUEST)
         except IntegrityError as e:
             return Response({"error": {"non_field_error": "A database error occurred"}}, status=status.HTTP_400_BAD_REQUEST)
@@ -443,27 +444,31 @@ class Toggle2FAAPIView(APIView):
     
 class Verify2FASetupAPIView(APIView):
     """
-    Verifies the OTP provided by the user during the initial 2FA setup process
+    Verifies the OTP provided by the user during the initial 2FA setup process.
     """
     @method_decorator(login_required)
     def post(self, request, *args, **kwargs):
         user = request.user
         otp_provided = request.data.get("otp")
-        
+
         if not user.tfa_secret:
-            return Response({"error": "2FA is not set up."}, status=status.HTTP_400_BAD_REQUEST)
+            logger.error("Attempt to verify OTP without 2FA setup by user:", user.username)
+            return Response({"error": {"tfa_setup": "2FA is not set up."}}, status=status.HTTP_400_BAD_REQUEST)
         
         totp = pyotp.TOTP(user.tfa_secret)
-        
-        # wrapping the DB operation w/ transaction.atomic(), Django ensures that either all operations within
-        # the block are sucessfully committed to the db or none of them are. 
-        with transaction.atomic():
-            if totp.verify(otp_provided):
-                user.is_2fa_enabled = True
-                user.save(update_fields=["is_2fa_enabled"])
-                return Response({"success": "2FA setup is complete"}, status=status.HTTP_200_OK)
-            else:
-                return Response({"error": "Invalid OTP. Please try again"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            with transaction.atomic():
+                if totp.verify(otp_provided):
+                    user.is_2fa_enabled = True
+                    user.save(update_fields=["is_2fa_enabled"])
+                    logger.info("2FA setup completed successfully for user:", user.username)
+                    return Response({"success": "2FA setup is complete"}, status=status.HTTP_200_OK)
+                else:
+                    logger.warning("Invalid OTP attempt for user:", user.username)
+                    return Response({"error": {"otp": "Invalid OTP. Please try again"}}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.error("Error during 2FA verification for user:", user.username, str(e))
+            return Response({"error": {"unexpected": "An unexpected error occurred. Please try again later."}}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
         
