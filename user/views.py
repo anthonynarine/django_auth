@@ -448,9 +448,14 @@ class Verify2FASetupAPIView(APIView):
     """
     @method_decorator(login_required)
     def post(self, request, *args, **kwargs):
+        # Retrieve the current user
         user = request.user
+        
+        # Extract the OTP from the request data. This OTP is expected to be provided by the user after scanning their 2FA setup QR code.
         otp_provided = request.data.get("otp")
 
+        # Check if the 2FA secret key is set for the user. This key is necessary to verify the OTP.
+        # If it's not set, it means the 2FA setup was not initialized properly, and the verification cannot proceed.
         if not user.tfa_secret:
             logger.error(f"Attempt to verify OTP without 2FA setup by user: {user.username}")
             return Response({"error": {"tfa_setup": "2FA is not set up."}}, status=status.HTTP_400_BAD_REQUEST)
