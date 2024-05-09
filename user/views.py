@@ -452,7 +452,7 @@ class Verify2FASetupAPIView(APIView):
         otp_provided = request.data.get("otp")
 
         if not user.tfa_secret:
-            logger.error("Attempt to verify OTP without 2FA setup by user:", user.username)
+            logger.error(f"Attempt to verify OTP without 2FA setup by user: {user.username}")
             return Response({"error": {"tfa_setup": "2FA is not set up."}}, status=status.HTTP_400_BAD_REQUEST)
         
         totp = pyotp.TOTP(user.tfa_secret)
@@ -461,13 +461,42 @@ class Verify2FASetupAPIView(APIView):
                 if totp.verify(otp_provided):
                     user.is_2fa_enabled = True
                     user.save(update_fields=["is_2fa_enabled"])
-                    logger.info("2FA setup completed successfully for user:", user.username)
-                    return Response({"success": "2FA setup is complete"}, status=status.HTTP_200_OK)
+                    
+                    # Invalidate old refresh token
+                    old_refresh_token = request.COOKIES.get("refresh_token")
+                    if old_refresh_token:
+                        UserToken.objects.filter(user=user, token=old_refresh_token).delete()
+                    
+                    # Create new access and refresh tokens
+                    # access_token is not sent via Httponly cookie for front end demo using js.cookie
+                    new_access_token = create_access_token(user.id)
+                    new_refresh_token = create_refresh_token(user.id)
+                    UserToken.objects.create(
+                        user=user,
+                        token=new_refresh_token,
+                        expired_at=timezone.now() + timedelta(days=7) 
+                    )
+                    
+                    # Preapte and send the response with the new tokens
+                    response = Response({
+                        "message": "2FA setup complete, new tokens issued",
+                        "access_token": new_access_token, 
+                    }, status=status.HTTP_200_OK)
+                    
+                    # Set Refresh toke as HttpOnly cookie
+                    response.set_cookie("refresh_token", new_refresh_token, httponly=True, secure=True, samesite="Strict")
+                    
+                    # Set CSRF token
+                    csrf_token = get_token(request)
+                    response.set_cookie("csrftoken", csrf_token, httponly=True, secure=True, samesite="Strict")
+                    
+                    logger.info(f"2FA setup completed successfully for user: {user.username}")
+                    return response
                 else:
-                    logger.warning("Invalid OTP attempt for user:", user.username)
+                    logger.warning(f"Invalid OTP attempt for user: {user.username}")
                     return Response({"error": {"otp": "Invalid OTP. Please try again"}}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            logger.error("Error during 2FA verification for user:", user.username, str(e))
+            logger.error(f"Error during 2FA verification for user: {user.username}. Exception: {str(e)}")
             return Response({"error": {"unexpected": "An unexpected error occurred. Please try again later."}}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
