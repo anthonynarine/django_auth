@@ -10,7 +10,7 @@ from decouple import config
 
 # Third-party imports
 from django.contrib.auth.password_validation import validate_password
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, authenticate
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.validators import validate_email
@@ -173,11 +173,10 @@ class LoginAPIView(APIView):
             logger.info("Login attempt failed: Missing email or password.")
             return Response({'error': 'Email and password are required'}, status=status.HTTP_400_BAD_REQUEST)
         
-        # Retrieve user by normalized email and verify password.
-        user = User.objects.filter(email=email).first()
-        if user is None or not user.check_password(password):
-            logger.info(f"Login attempt failed for {email}: Invalid credentials.")
-            return Response({'error': 'Invalid email or password'}, status=status.HTTP_401_UNAUTHORIZED)
+        # Authenticate the user using username and password w/ authenticate Django function
+        user = authenticate(username=email, password=password)
+        if not user:
+            return Response({"error": "Invalid email or passowrd"}, status=status.HTTP_401_UNAUTHORIZED)
         
         # If 2FA is enabled, require the second factor authentication.
         if user.is_2fa_enabled:
@@ -221,13 +220,14 @@ class TwoFactorLoginAPIView(APIView):
         """
         data = request.data
         email = data.get("email", "").strip().lower()  # email normalization
+        password = data.get("password")
         otp = data.get("otp")
         
-        # Retrieve the user and ensure 2FA is set up
-        user = User.objects.filter(email=email).first()
-        if user is None or not user.tfa_secret:
-            raise exceptions.AuthenticationFailed("Authentication failed.")
-        
+        # Authenticate the user using username and password w/ authenticate Django function
+        user = authenticate(username=email, password=password)
+        if not user or not user.is_2fa_enabled:
+            return Response({"error": "Authentication failed. User not found or 2FA not set up."}, status=status.HTTP_401_UNAUTHORIZED)
+                
         # Verify OTP
         totp = pyotp.TOTP(user.tfa_secret)
         if totp.verify(otp):

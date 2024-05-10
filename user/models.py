@@ -33,10 +33,11 @@ class CustomUser(AbstractUser):
         verbose_name='Last Name',
         help_text='Enter your last name.'
     )
-    password = models.CharField(
-        max_length=255,
-        help_text='Enter a secure password.'
-    )
+    # This field is not needed 
+    # password = models.CharField(
+    #     max_length=255,
+    #     help_text='Enter a secure password.'
+    # )
     username = None  # Username is not used in this model.
     tfa_secret = models.CharField(
         max_length=255,
