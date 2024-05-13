@@ -422,7 +422,7 @@ class Toggle2FAAPIView(APIView):
     Handles the PATCH request to toggle the "is_2fa_enabled" field of the user
     
     Expects:
-        request.datta: Dictionary containing "is_2fa_enabled" key with the boolean value
+        request.data: Dictionary containing "is_2fa_enabled" key with the boolean value
         
     Returns:
         Response object with the new state of "is_2fa_enabled" or an error message
@@ -491,7 +491,7 @@ class Verify2FASetupAPIView(APIView):
                     # Set Refresh toke as HttpOnly cookie
                     response.set_cookie("refresh_token", new_refresh_token, httponly=True, secure=True, samesite="Strict")
                     
-                    # Set CSRF token
+                    # Set CSRF token (this is good security practice see below for notes on get_token())
                     csrf_token = get_token(request)
                     response.set_cookie("csrftoken", csrf_token, httponly=True, secure=True, samesite="Strict")
                     
@@ -505,4 +505,11 @@ class Verify2FASetupAPIView(APIView):
             return Response({"error": {"unexpected": "An unexpected error occurred. Please try again later."}}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+        """"
+        Django CSRF Token Handling (see line 495 - verify2FASetupAPIView)
+        get_token(request): This function is part of Django's CSRF protection mechanism.
+        When called, it checks for an existing CSRF token associated with the user's session.
+        If a token does not exist, it generates a new one. If a token already exists, 
+        it will return the existing token.
         
+        """
