@@ -493,7 +493,7 @@ class Verify2FASetupAPIView(APIView):
                     
                     # Set CSRF token (this is good security practice see below for notes on get_token())
                     csrf_token = get_token(request)
-                    response.set_cookie("csrftoken", csrf_token, httponly=True, secure=True, samesite="Strict")
+                    response.set_cookie("csrftoken", csrf_token, httponly=False, secure=True, samesite="Strict")
                     
                     logger.info(f"2FA setup completed successfully for user: {user.username}")
                     return response

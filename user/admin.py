@@ -7,8 +7,8 @@ logger = logging.getLogger(__name__)
 
 @admin.register(CustomUser)
 class UserAdmin(admin.ModelAdmin):
-    fields = ["first_name", "last_name", "email", "password"]
-    list_display = ["first_name", "last_name", "email", "password"]
+    fields = ["first_name", "last_name", "email", "is_2fa_enabled"]
+    list_display = ["first_name", "last_name", "email", "is_2fa_enabled" ]
     
 @admin.register(UserToken)
 class UserTokenAdmin(admin.ModelAdmin):
