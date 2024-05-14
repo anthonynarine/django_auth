@@ -236,8 +236,11 @@ class TwoFactorLoginAPIView(APIView):
             refresh_token = create_refresh_token(user.id)
             UserToken.objects.create(user_id=user.id, token=refresh_token, expired_at=timezone.now() + timedelta(days=7))
             
+            csrf_token = get_token(request)
+            
             response = Response({"access_token": access_token})
             response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=True, samesite="Strict")
+            response.set_cookie("csrftoken", csrf_token, httponly=False, secure=True, samesite='Strict')
             return response
         else:
             raise exceptions.AuthenticationFailed("Authentication failed.")
