@@ -37,19 +37,20 @@ class JWTAuthentication(BaseAuthentication):
             try:
                 user_id = decode_access_token(token)
                 user = User.objects.get(pk=user_id)
-                logger.info(f"{GREEN}user object accessed{END}")  
-                
-                return (user, token)
-            
+                logger.info(f"{GREEN}User object accessed for user_id={user_id}{END}")
+                return (user, token)         
             except jwt.ExpiredSignatureError:
+                logger.warning(f"{RED}Token has expired{END}")
                 raise exceptions.AuthenticationFailed("Token has expired", code=401)
             except jwt.InvalidTokenError:
+                logger.error(f"{RED}Invalid token encountered{END}")
                 raise exceptions.AuthenticationFailed("User not Found", code=401)
             except User.DoesNotExist:
+                logger.error(f"{RED}User not found for user_id={user_id}{END}")
                 raise exceptions.AuthenticationFailed("User not found", code=401)
             except Exception as e:
+                logger.error(f"{RED}Authentication Failed: {str(e)}{END}")
                 raise exceptions.AuthenticationFailed(f"Authentication Failed: {str(e)}")
-
         return None
         
 def create_access_token(user_id):
@@ -68,7 +69,7 @@ def create_access_token(user_id):
     # Payload of the token with user_id, expiration time, and issued at time.
     payload = {
         "user_id": user_id,  # Unique identifier for the user
-        "exp": datetime.now(timezone.utc) + timedelta(minutes=20),  # Token expiration time (30 seconds from now)
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=20),  # Token expiration time (20 mins from now)
         "iat": datetime.now(timezone.utc)  # Token issue time
     }
     # Encoding the payload with a secret key and specifying HS256 as the algorithm
@@ -77,14 +78,16 @@ def create_access_token(user_id):
 def decode_access_token(token):
     try:
         payload = jwt.decode(token, JWT_ACCESS_SECRET, algorithms=["HS256"])
-
+        logger.info(f"{GREEN}Access token validated for user_id={payload['user_id']}{END}")
         return payload["user_id"]
     except jwt.ExpiredSignatureError:
+        logger.warning(f"{RED}Token has expired{END}")
         raise jwt.ExpiredSignatureError("The token has expired.")
-    except jwt.InvalidTokenError:
+    except jwt.InvalidTokenError as e:
+        logger.error(f"{RED}Invalid token encountered: {e}{END}")
         raise jwt.InvalidTokenError("Invalid token.")
     except Exception as e:
-        # A generic exception for a catch-all unexpected errors;
+        logger.error(f"{RED}Unexpected error decoding token: {str(e)}{END}")
         raise exceptions.AuthenticationFailed(f"Token cannot be decoded: {str(e)}")
 
 
@@ -126,4 +129,28 @@ def decode_refresh_token(token):
         logger.error(f"Unexpected error decoding token: {e}")  # Log unexpected errors
         raise exceptions.AuthenticationFailed(f"Token cannot be decoded: {str(e)}")
     
-    
+def create_temporary_2fa_token(user_id):
+    """
+    Generate a JWT toke for two-factor authentication verfication
+
+    This token is short-lived expiring 10 minutes after issuance. It's used to maintain a secure state between the initial login and completion of the 2fa verifcation. 
+
+    Args:
+        user_id: The unique identifier for the user (database ID).
+
+    Returns:
+        A JWT temporary token as a string, encoded with HS256 algorithm.
+    """
+    # Define the expiration time and additional claims for the 2FA process
+    expiration = datetime.now(timezone.utc) + timedelta(minutes=10)
+    payload = {
+        "user_id": user_id, # Unique identifer for the user
+        "type": "2FA_temporary", # Specify the type of toke 
+        "exp": expiration, # Token expiration time set above
+        "iat": datetime.now(timezone.utc), # Token issue time
+        "2fa_stage": "awaiting_verification" # Indicate the 2Fa verication is pending
+    }
+    # Encode the token using the access token's secret (from simplicity)
+    token = jwt.encode(payload, JWT_ACCESS_SECRET, algorithm="HS256")
+    logger.info(f"{GREEN}Temporary 2FA token issued for user_id={user_id}{END}")
+    return token

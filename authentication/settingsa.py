@@ -83,13 +83,16 @@ DATABASES = {
     }
 }
 
-# Static files configuration
+
+
+
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 
 # Internationalization and Time Zone
+
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = 'America/New_York'
 USE_I18N = True
@@ -97,6 +100,7 @@ USE_L10N = True
 USE_TZ = True
 
 # Authentication and Users
+
 AUTH_USER_MODEL = "user.CustomUser"
 AUTH_PASSWORD_VALIDATORS = [
     # Password validators...
@@ -104,6 +108,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 
 # CORS Headers Configuration
+
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:3001",
@@ -118,7 +123,8 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 
 
-# JWT Secretes
+# Security Settings
+
 JWT_ACCESS_SECRET = config('JWT_ACCESS_SECRET')
 JWT_REFRESH_SECRET = config('JWT_REFRESH_SECRET')
 
@@ -127,6 +133,7 @@ if not JWT_ACCESS_SECRET or not JWT_REFRESH_SECRET:
     sys.exit(1)
 
 # Logging Configuration
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -158,34 +165,16 @@ LOGGING = {
     },
 }
 
-# Email Settings
-DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL")
 
-AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-        'OPTIONS': {
-            'user_attributes': ('username', 'email', 'first_name', 'last_name'),
-            'max_similarity': 0.7,
-        },
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-        'OPTIONS': {
-            'min_length': 8,
-        },
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-        'OPTIONS': {
-            'password_list_path': 'D:/react-django/django_auth/auth_venv/Lib/site-packages/django/contrib/auth/common-passwords.txt.gz',
-        },
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
-]
+# Email Configuration (example for MailHog or similar service)
+
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_HOST = 'localhost'
+# EMAIL_PORT = 1025
+# EMAIL_USE_TLS = False
+DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL")
 
 
 # Heroku Deployment Integration
+
 django_heroku.settings(locals())
