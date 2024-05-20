@@ -185,3 +185,31 @@ def create_temporary_2fa_token(user_id):
     token = jwt.encode(payload, JWT_ACCESS_SECRET, algorithm="HS256")
     logger.info(f"{GREEN}Temporary 2FA token issued for user_id={user_id}{END}")
     return token
+
+def decode_temporary_token(token):
+    """
+    Decode a JWT temporary token for two-factor authentication verification.
+
+    Args:
+        token (str): The JWT token to decode.
+
+    Returns:
+        int: The user ID extracted from the token.
+
+    Raises:
+        AuthenticationFailed: If the token is invalid or has expired.
+    """
+    try:
+        payload = jwt.decode(token, JWT_ACCESS_SECRET, algorithms=["HS256"])
+        if payload.get("type") != "2FA_temporary":
+            raise jwt.InvalidTokenError("Invalid token type.")
+        return payload["user_id"]
+    except jwt.ExpiredSignatureError:
+        logger.warning(f"{RED}Temporary token has expired{END}")
+        raise exceptions.AuthenticationFailed("Temporary token has expired.")
+    except jwt.InvalidTokenError as e:
+        logger.error(f"{RED}Invalid temporary token: {e}{END}")
+        raise exceptions.AuthenticationFailed("Invalid temporary token.")
+    except Exception as e:
+        logger.error(f"{RED}Unexpected error decoding temporary token: {e}{END}")
+        raise exceptions.AuthenticationFailed(f"Token cannot be decoded: {str(e)}")

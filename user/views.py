@@ -10,7 +10,7 @@ from decouple import config
 
 # Third-party imports
 from django.contrib.auth.password_validation import validate_password
-from django.contrib.auth import get_user_model, authenticate, login
+from django.contrib.auth import get_user_model, authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.validators import validate_email
@@ -44,7 +44,7 @@ from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 
 # Local application/library specific imports
-from .auth_token import JWT_ACCESS_SECRET, create_access_token, create_refresh_token, decode_refresh_token, JWTAuthentication, create_temporary_2fa_token
+from .auth_token import JWT_ACCESS_SECRET, create_access_token, create_refresh_token, decode_refresh_token, JWTAuthentication, create_temporary_2fa_token, decode_temporary_token
 from .models import CustomUser, TemporarySecurityToken, UserToken, Reset
 from .serializers import CustomUserSerializer
 from django.http import HttpResponse
@@ -56,6 +56,12 @@ User = get_user_model()
 print(User)
 
 logger = logging.getLogger(__name__)
+# Test logging
+logger.debug("This is a debug message")
+logger.info("This is an info message")
+logger.warning("This is a warning message")
+logger.error("This is an error message")
+logger.critical("This is a critical message")
 
 # ANSI color codes for logger
 RED = '\033[91m'
@@ -251,27 +257,46 @@ class TwoFactorLoginAPIView(APIView):
         If successful, generates access and refresh tokens.
         """
         data = request.data
-        email = data.get("email", "").strip().lower()  # email normalization
-        password = data.get("password")
-        otp = data.get("otp")
+        otp = data.get("otp") # Extract the OTP from the request data
+        temp_token = request.COOKIES.get("temp_token") # Get the temporary token from cookies
         
-        # Authenticate the user using username and password w/ authenticate Django function
-        user = authenticate(username=email, password=password)
+        # Log the received OTP and temp_token
+        logger.debug(f"Receied OTP: {otp}")
+        logger.debug(f"Received temp_token: {temp_token}")
+        
+        # Check if both OTP and temporary token are provided
+        if not otp or temp_token:
+            return Response({"error": "OTP and temporary token are required."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            # Decode the temporary token to get the user ID
+            user_id = decode_temporary_token(temp_token)
+        except exceptions.AuthenticationFailed as e:
+            # Return an error response if the token is invalid or has expired
+            return Response({"error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        #  # Retrieve the user based on the user ID from the temporary token
+        user = get_object_or_404(User, id=user_id)
         if not user or not user.is_2fa_enabled:
             return Response({"error": "Authentication failed. User not found or 2FA not set up."}, status=status.HTTP_401_UNAUTHORIZED)
                 
-        # Verify OTP
+        # Verify OTP using the user's 2FA secret
         totp = pyotp.TOTP(user.tfa_secret)
         if totp.verify(otp):
             # OTP verification successful; proceed with generating tokens
             access_token = create_access_token(user.id)
             refresh_token = create_refresh_token(user.id)
+            
+            # Store the refresh token in the database with an expiration date
             UserToken.objects.create(user_id=user.id, token=refresh_token, expired_at=timezone.now() + timedelta(days=7))
             
             csrf_token = get_token(request)
             
+            # Create the response with the access token
             response = Response({"access_token": access_token})
+            # Set the refresh toke as an HTTP-only cookie
             response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=True, samesite="Strict")
+            # Set the CSRF token as a cookie
             response.set_cookie("csrftoken", csrf_token, httponly=False, secure=True, samesite='Strict')
             return response
         else:
@@ -338,6 +363,7 @@ class LogoutAPIView(APIView):
         
         response = Response()
         response.delete_cookie(key="refresh_token")
+        logout(request)
         response.data = {
             "message": "Signed out"
         }

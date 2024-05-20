@@ -4,6 +4,8 @@ from pathlib import Path
 from decouple import config
 import django_heroku
 import dj_database_url
+import logging.config
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -164,8 +166,15 @@ LOGGING = {
             'level': 'DEBUG',
             'propagate': True,
         },
+        '__name__': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
     },
 }
+
+logging.config.dictConfig(LOGGING)
 
 # Email Settings
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL")
