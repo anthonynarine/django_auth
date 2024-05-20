@@ -10,7 +10,7 @@ from decouple import config
 
 # Third-party imports
 from django.contrib.auth.password_validation import validate_password
-from django.contrib.auth import get_user_model, authenticate
+from django.contrib.auth import get_user_model, authenticate, login
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.validators import validate_email
@@ -44,7 +44,7 @@ from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 
 # Local application/library specific imports
-from .auth_token import JWT_ACCESS_SECRET, create_access_token, create_refresh_token, decode_refresh_token, JWTAuthentication
+from .auth_token import JWT_ACCESS_SECRET, create_access_token, create_refresh_token, decode_refresh_token, JWTAuthentication, create_temporary_2fa_token
 from .models import CustomUser, TemporarySecurityToken, UserToken, Reset
 from .serializers import CustomUserSerializer
 from django.http import HttpResponse
@@ -141,10 +141,10 @@ class RegisterAPIView(APIView):
         
 class LoginAPIView(APIView):
     """
-    API view to handle user login requests.
-
-    Validates user credentials and checks for two-factor authentication requirements.
-    On successful login, returns an access token and sets a secure cookie with a refresh token.
+    API view that handles user login requests. This view validates user credentials,
+    checks for two-factor authentication requirements, and manages the issuance of tokens.
+    It supports the first step of login which involves username and password verification,
+    and if 2FA is enabled, it issues a temporary token for further verification.
 
     Attributes:
         None
@@ -153,59 +153,91 @@ class LoginAPIView(APIView):
         post(request): Processes the POST request to log in a user.
     """
 
+    permission_classes = [AllowAny]  # Allow access to any user regardless of their authentication status.
+
     def post(self, request):
         """
         Handle POST request to authenticate a user.
+
+        First, it validates the provided email and password. If authentication is successful,
+        it checks whether 2FA is enabled for the user. If 2FA is enabled, it issues a temporary
+        token and sets it in an HTTP-only cookie. Otherwise, it issues access and refresh tokens.
 
         Parameters:
             request (HttpRequest): The request object containing the email and password.
 
         Returns:
             Response: Django REST Framework response object with either error message and status code
-                        or successful login data and tokens.
+                    or successful login data and tokens.
         """
-        data = request.data.copy()
+        data = request.data.copy()  # Copy data to prevent mutable data issues.
         email = data.get("email", "").strip().lower()  # Normalize email to ensure case-insensitive comparison.
         password = data.get("password")
-        
+
         # Check if both email and password are provided.
         if not email or not password:
             logger.info("Login attempt failed: Missing email or password.")
             return Response({'error': 'Email and password are required'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Authenticate the user using username and password w/ authenticate Django function
+
+        # Authenticate the user using username and password
         user = authenticate(username=email, password=password)
         if not user:
-            return Response({"error": "Invalid email or passowrd"}, status=status.HTTP_401_UNAUTHORIZED)
-        
-        # If 2FA is enabled, require the second factor authentication.
+            # Log and respond if authentication fails
+            logger.error("Authentication failed: Invalid email or password.")
+            return Response({"error": "Invalid email or password"}, status=status.HTTP_401_UNAUTHORIZED)
+
+        # Log the user in, which establishes the user's session.
+        login(request, user)
+
+        # Check if 2FA is enabled for the user
         if user.is_2fa_enabled:
-            logger.info(f"2FA required for user {email}.")
-            return Response({'message': '2FA required', '2fa_required': True}, status=status.HTTP_206_PARTIAL_CONTENT)
-        
-        # Try to create access and refresh tokens if no exceptions are raised.
+            try:
+                # Create a temporary token specifically for 2FA verification
+                temp_token = create_temporary_2fa_token(user.id)
+                response = Response({'message': '2FA required', '2fa_required': True}, status=status.HTTP_401_UNAUTHORIZED)
+                response.set_cookie(
+                    "temp_token", temp_token, max_age=600,  # Token expires in 10 minutes
+                    httponly=True,  # Cookie is not accessible via JavaScript (helps prevent XSS attacks)
+                    secure=True,  # Cookie is only sent over HTTPS (secures data in transit)
+                    samesite="Lax"  # Cookie is not sent on cross-origin requests (mitigates CSRF risks)
+                )
+                logger.info(f"2FA required for user {email}. Temporary token issued.")
+                return response
+            except Exception as e:
+                # Handle exceptions related to temporary token creation
+                logger.error(f"Failed to create temporary token for user {email}: {str(e)}")
+                return Response({'error': 'Internal server error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        # If 2FA is not enabled, proceed with creating access and refresh tokens
         try:
             access_token = create_access_token(user.id)
             refresh_token = create_refresh_token(user.id)
             UserToken.objects.create(
-                user_id=user.id, 
-                token=refresh_token, 
-                expired_at=timezone.now() + timedelta(days=7) 
+                user_id=user.id,
+                token=refresh_token,
+                expired_at=timezone.now() + timedelta(days=7)
             )
+            response = Response({
+                "message": "Logged in successfully.",
+                "access_token": access_token
+            }, status=status.HTTP_200_OK)
+            response.set_cookie(
+                "refresh_token", refresh_token, max_age=604800,  # Cookie expires in 7 days
+                httponly=True,  # Cookie is not accessible via JavaScript (helps prevent XSS attacks)
+                secure=True,  # Cookie is only sent over HTTPS (secures data in transit)
+                samesite='Strict'  # Cookie is not sent on cross-origin requests (strong mitigation against CSRF)
+            )
+            # Set CSRF token in the cookie for additional security.
+            csrf_token = get_token(request)
+            response.set_cookie("csrftoken", csrf_token, httponly=False, secure=True, samesite="Strict")
+            
+            logger.info(f"Successful login for {email}. Full access tokens created and sent.")
+            return response
         except Exception as e:
-            logger.error(f"Error creating tokens for {email}: {str(e)}")
+            # Handle exceptions related to full access token creation
+            logger.error(f"Error creating tokens for user {email}: {str(e)}")
             return Response({'error': 'Unable to create tokens'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        # Prepare and send the successful response with the access token.
-        response = Response({"access_token": access_token}, status=status.HTTP_200_OK)
-        response.set_cookie("refresh_token", refresh_token, httponly=True, secure=True, samesite='Strict')
-        
-        # Set CSRF token in the cookie for additional security.
-        csrf_token = get_token(request)
-        response.set_cookie("csrftoken", csrf_token, httponly=False, secure=True, samesite="Strict")
-        
-        logger.info(f"Successful login for {email}. Tokens created and sent.")
-        return response
     
 class TwoFactorLoginAPIView(APIView):
     
@@ -496,7 +528,8 @@ class Verify2FASetupAPIView(APIView):
                     
                     # Set CSRF token (this is good security practice see below for notes on get_token())
                     csrf_token = get_token(request)
-                    response.set_cookie("csrftoken", csrf_token, httponly=False, secure=True, samesite="Strict")
+                    response.set_cookie("csrftoken", csrf_token, httponly=False, secure=True, samesite="Strict")                              
+                                        
                     
                     logger.info(f"2FA setup completed successfully for user: {user.username}")
                     return response

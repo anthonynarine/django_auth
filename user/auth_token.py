@@ -28,28 +28,59 @@ END = '\033[0m'
 
 
 class JWTAuthentication(BaseAuthentication):
-    def authenticate(self, request):
-        auth_header = get_authorization_header(request).decode("utf-8")
-        auth = auth_header.split()
+    """
+    Custom authentication class that handles JWT authentication.
 
+    This class authenticates requests by extracting and validating a JWT from the Authorization header.
+    It checks the token's validity, decodes it to extract the user ID, and fetches the corresponding user
+    object from the database.
+
+    Attributes:
+        None
+
+    Methods:
+        authenticate(request): Attempts to authenticate a request based on a JWT in the Authorization header.
+    """
+
+    def authenticate(self, request):
+        """
+        Authenticate the incoming request by checking for a JWT in the 'Authorization' header.
+
+        This method splits the Authorization header to extract the JWT, verifies its validity,
+        and attempts to fetch the corresponding user from the database.
+
+        Parameters:
+            request (HttpRequest): The HttpRequest object.
+
+        Returns:
+            tuple: A tuple of (User, token) if authentication is successful, None otherwise.
+
+        Raises:
+            AuthenticationFailed: If the token is expired, invalid, or if the user does not exist.
+        """
+        auth_header = get_authorization_header(request).decode("utf-8")
+        if not auth_header:
+            return None
+
+        auth = auth_header.split()
         if auth and len(auth) == 2 and auth[0].lower() == "bearer":
             token = auth[1]
             try:
                 user_id = decode_access_token(token)
                 user = User.objects.get(pk=user_id)
-                logger.info(f"{GREEN}User object accessed for user_id={user_id}{END}")
-                return (user, token)         
+                logger.info(f"User object accessed for user_id={user_id}")
+                return (user, token)
             except jwt.ExpiredSignatureError:
-                logger.warning(f"{RED}Token has expired{END}")
+                logger.warning("Token has expired")
                 raise exceptions.AuthenticationFailed("Token has expired", code=401)
             except jwt.InvalidTokenError:
-                logger.error(f"{RED}Invalid token encountered{END}")
-                raise exceptions.AuthenticationFailed("User not Found", code=401)
+                logger.error("Invalid token encountered")
+                raise exceptions.AuthenticationFailed("User not found", code=401)
             except User.DoesNotExist:
-                logger.error(f"{RED}User not found for user_id={user_id}{END}")
+                logger.error(f"User not found for user_id={user_id}")
                 raise exceptions.AuthenticationFailed("User not found", code=401)
             except Exception as e:
-                logger.error(f"{RED}Authentication Failed: {str(e)}{END}")
+                logger.error(f"Authentication Failed: {str(e)}")
                 raise exceptions.AuthenticationFailed(f"Authentication Failed: {str(e)}")
         return None
         
