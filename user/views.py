@@ -286,7 +286,7 @@ class TwoFactorLoginAPIView(APIView):
             return Response({"error": "Authentication failed. User not found or 2FA not set up."}, status=status.HTTP_401_UNAUTHORIZED)
             
         if not user or not user.is_2fa_enabled:
-            
+            logger.warning("2FA not enabled for this user")
             return Response({"error": "Authentication failed. User not found or 2FA not set up."}, status=status.HTTP_401_UNAUTHORIZED)
                 
         # Verify OTP using the user's 2FA secret
@@ -309,6 +309,7 @@ class TwoFactorLoginAPIView(APIView):
             response.set_cookie("csrftoken", csrf_token, httponly=False, secure=True, samesite='Strict')
             return response
         else:
+            logger.warning("Invalid OTP")
             raise exceptions.AuthenticationFailed("Authentication failed.")
 
 class GenerateQRCodeAPIView(APIView):
