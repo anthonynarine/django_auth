@@ -19,6 +19,7 @@ User = get_user_model()
 # Get the JWT secrets using config
 JWT_ACCESS_SECRET = config('JWT_ACCESS_SECRET')
 JWT_REFRESH_SECRET = config('JWT_REFRESH_SECRET')
+JWT_TEMP_SECRET = config("JWT_TEMP_SECRET")
 
 logger = logging.getLogger(__name__)
 # ANSI color codes for logger
@@ -182,7 +183,7 @@ def create_temporary_2fa_token(user_id):
         "2fa_stage": "awaiting_verification" # Indicate the 2Fa verication is pending
     }
     # Encode the token using the access token's secret (from simplicity)
-    token = jwt.encode(payload, JWT_ACCESS_SECRET, algorithm="HS256")
+    token = jwt.encode(payload, JWT_TEMP_SECRET, algorithm="HS256")
     logger.info(f"{GREEN}Temporary 2FA token issued for user_id={user_id}{END}")
     return token
 
@@ -200,7 +201,7 @@ def decode_temporary_token(token):
         AuthenticationFailed: If the token is invalid or has expired.
     """
     try:
-        payload = jwt.decode(token, JWT_ACCESS_SECRET, algorithms=["HS256"])
+        payload = jwt.decode(token, JWT_TEMP_SECRET, algorithms=["HS256"])
         if payload.get("type") != "2FA_temporary":
             raise jwt.InvalidTokenError("Invalid token type.")
         return payload["user_id"]

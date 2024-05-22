@@ -4,5 +4,5 @@ new_secret_key = get_random_secret_key()
 print(new_secret_key)
 
 
-# to run 
+# run in terminal not python shell
 # python3 gen_secret_key.py

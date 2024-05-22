@@ -266,18 +266,27 @@ class TwoFactorLoginAPIView(APIView):
         
         # Check if both OTP and temporary token are provided
         if not otp or temp_token:
+            logger.warning("Missing OTP or temporary token")
             return Response({"error": "OTP and temporary token are required."}, status=status.HTTP_400_BAD_REQUEST)
         
         try:
             # Decode the temporary token to get the user ID
             user_id = decode_temporary_token(temp_token)
+            logger.debug(f"Decoded user ID: {user_id}")
         except exceptions.AuthenticationFailed as e:
+            logger.warning(f"Token decoding failed: {str(e)}")
             # Return an error response if the token is invalid or has expired
             return Response({"error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
         
         #  # Retrieve the user based on the user ID from the temporary token
-        user = get_object_or_404(User, id=user_id)
+        try:
+            user = get_object_or_404(User, id=user_id)
+        except Exception as e:
+            logger.error(f"Failed to retrieve user: {str(e)}")
+            return Response({"error": "Authentication failed. User not found or 2FA not set up."}, status=status.HTTP_401_UNAUTHORIZED)
+            
         if not user or not user.is_2fa_enabled:
+            
             return Response({"error": "Authentication failed. User not found or 2FA not set up."}, status=status.HTTP_401_UNAUTHORIZED)
                 
         # Verify OTP using the user's 2FA secret
