@@ -265,7 +265,7 @@ class TwoFactorLoginAPIView(APIView):
         logger.debug(f"Received temp_token: {temp_token}")
         
         # Check if both OTP and temporary token are provided
-        if not otp or temp_token:
+        if not otp or not temp_token:
             logger.warning("Missing OTP or temporary token")
             return Response({"error": "OTP and temporary token are required."}, status=status.HTTP_400_BAD_REQUEST)
         
@@ -293,6 +293,7 @@ class TwoFactorLoginAPIView(APIView):
         totp = pyotp.TOTP(user.tfa_secret)
         if totp.verify(otp):
             # OTP verification successful; proceed with generating tokens
+            logger.debug("OTP verification successful")
             access_token = create_access_token(user.id)
             refresh_token = create_refresh_token(user.id)
             
