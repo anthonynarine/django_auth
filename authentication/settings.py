@@ -50,6 +50,7 @@ MIDDLEWARE = [
     "user.middleware.TokenAuthenticationMiddleware", 
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "authentication.disable_csrf_middleware.DisableCSRFMiddleware", 
 ]
 
 # URL and WSGI Configuration

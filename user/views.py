@@ -35,6 +35,7 @@ from rest_framework.permissions import AllowAny
 from django.contrib.auth.models import AnonymousUser
 from django.middleware.csrf import get_token
 from rest_framework.exceptions import ValidationError as DRFValidationError
+from django.views.decorators.csrf import csrf_exempt
 
 import pyotp
 import qrcode
@@ -68,6 +69,11 @@ RED = '\033[91m'
 GREEN = '\033[92m'
 END = '\033[0m'
 
+
+@method_decorator(csrf_exempt, name='dispatch')
+class TestCSRFExemptView(APIView):
+    def post(self, request):
+        return Response({'message': 'CSRF exempt view works'}, status=200)
 
     
 class RegisterAPIView(APIView):
@@ -144,7 +150,7 @@ class RegisterAPIView(APIView):
         except Exception as e:
             logger.error(f"Failed to send welcome email to {email}: {e}", exc_info=True)
 
-        
+@method_decorator(csrf_exempt, name='dispatch')
 class LoginAPIView(APIView):
     """
     API view that handles user login requests. This view validates user credentials,
@@ -176,6 +182,7 @@ class LoginAPIView(APIView):
             Response: Django REST Framework response object with either error message and status code
                     or successful login data and tokens.
         """
+        logger.info("LoginAPIView: Received request with data: %s", request.data)
         data = request.data.copy()  # Copy data to prevent mutable data issues.
         email = data.get("email", "").strip().lower()  # Normalize email to ensure case-insensitive comparison.
         password = data.get("password")
@@ -234,8 +241,8 @@ class LoginAPIView(APIView):
                 samesite='Strict'  # Cookie is not sent on cross-origin requests (strong mitigation against CSRF)
             )
             # Set CSRF token in the cookie for additional security.
-            csrf_token = get_token(request)
-            response.set_cookie("csrftoken", csrf_token, httponly=False, secure=True, samesite="Strict")
+            # csrf_token = get_token(request)
+            # response.set_cookie("csrftoken", csrf_token, httponly=False, secure=True, samesite="Strict")
             
             logger.info(f"Successful login for {email}. Full access tokens created and sent.")
             return response
@@ -367,17 +374,22 @@ class RefreshAPIView(APIView):
             "access token": access_token
         })
         
+@method_decorator(csrf_exempt, name='dispatch')        
 class LogoutAPIView(APIView):
     def post(self, request):
+        logger.info("LogoutAPIView: Received request with cookies: %s", request.COOKIES)
         refresh_token = request.COOKIES.get("refresh_token")
         UserToken.objects.filter(token=refresh_token).delete()
         
         response = Response()
         response.delete_cookie(key="refresh_token")
+        response.delete_cookie(key="csrftoken")
+        response.delete_cookie(key="temp_token")
         logout(request)
         response.data = {
             "message": "Signed out"
         }
+        logger.info("User signed out and tokens cleared")
         
         return response
 
@@ -500,17 +512,24 @@ class Toggle2FAAPIView(APIView):
         Response object with the new state of "is_2fa_enabled" or an error message
     """
     def patch(self, request):
-        # Check if the user is authenticated + middleware alread does this but i'll still keep this
+        logger.debug("Toggle2FAAPIView: Received request")
+        # Check if the user is authenticated + middleware already does this but I'll still keep this
         user = request.user
+        logger.debug(f"Request user: {user}")
+        
         if not user.is_authenticated:
-            return Response ({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
+            logger.error("Authentication failed: User is not authenticated")
+            return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
         
         is_2fa_enabled = request.data.get("is_2fa_enabled")
         if is_2fa_enabled is None:
+            logger.error("Missing 'is_2fa_enabled' parameter in request")
             return Response({"error": "Missing 'is_2fa_enabled' parameter. Please specify if two-factor authentication should be enabled or disabled."}, status=status.HTTP_400_BAD_REQUEST)
         
         user.is_2fa_enabled = is_2fa_enabled  
         user.save(update_fields=["is_2fa_enabled"])
+        
+        logger.info(f"2FA status toggled successfully for user {user.username}. New value: {is_2fa_enabled}")
         
         return Response({"is_2fa_enabled": user.is_2fa_enabled}, status=status.HTTP_200_OK)
     

@@ -11,6 +11,7 @@ from .views import (
     GenerateQRCodeAPIView,
     Verify2FASetupAPIView,
     Toggle2FAAPIView,
+    TestCSRFExemptView
 )
 
 urlpatterns = [
@@ -24,5 +25,9 @@ urlpatterns = [
     path("generate-qr/", GenerateQRCodeAPIView.as_view(), name="generate_qr_code"),
     path("verify-otp/", Verify2FASetupAPIView.as_view(), name="verify_2fa_setup"),
     path("validate-session/", ValidateSessionAPIView.as_view(), name="fetch_user"),
-    path("user/toggle-2fa/", Toggle2FAAPIView.as_view(), name="toggle_2fa")
+    path("user/toggle-2fa/", Toggle2FAAPIView.as_view(), name="toggle_2fa"),
+    path("test-csrf-exempt/", TestCSRFExemptView.as_view(), name="test_csrf_exempt"),
+    
 ]
+
+print("User URL patterns:", urlpatterns)

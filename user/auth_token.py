@@ -27,63 +27,6 @@ RED = '\033[91m'
 GREEN = '\033[92m'
 END = '\033[0m'
 
-
-class JWTAuthentication(BaseAuthentication):
-    """
-    Custom authentication class that handles JWT authentication.
-
-    This class authenticates requests by extracting and validating a JWT from the Authorization header.
-    It checks the token's validity, decodes it to extract the user ID, and fetches the corresponding user
-    object from the database.
-
-    Attributes:
-        None
-
-    Methods:
-        authenticate(request): Attempts to authenticate a request based on a JWT in the Authorization header.
-    """
-
-    def authenticate(self, request):
-        """
-        Authenticate the incoming request by checking for a JWT in the 'Authorization' header.
-
-        This method splits the Authorization header to extract the JWT, verifies its validity,
-        and attempts to fetch the corresponding user from the database.
-
-        Parameters:
-            request (HttpRequest): The HttpRequest object.
-
-        Returns:
-            tuple: A tuple of (User, token) if authentication is successful, None otherwise.
-
-        Raises:
-            AuthenticationFailed: If the token is expired, invalid, or if the user does not exist.
-        """
-        auth_header = get_authorization_header(request).decode("utf-8")
-        if not auth_header:
-            return None
-
-        auth = auth_header.split()
-        if auth and len(auth) == 2 and auth[0].lower() == "bearer":
-            token = auth[1]
-            try:
-                user_id = decode_access_token(token)
-                user = User.objects.get(pk=user_id)
-                logger.info(f"User object accessed for user_id={user_id}")
-                return (user, token)
-            except jwt.ExpiredSignatureError:
-                logger.warning("Token has expired")
-                raise exceptions.AuthenticationFailed("Token has expired", code=401)
-            except jwt.InvalidTokenError:
-                logger.error("Invalid token encountered")
-                raise exceptions.AuthenticationFailed("User not found", code=401)
-            except User.DoesNotExist:
-                logger.error(f"User not found for user_id={user_id}")
-                raise exceptions.AuthenticationFailed("User not found", code=401)
-            except Exception as e:
-                logger.error(f"Authentication Failed: {str(e)}")
-                raise exceptions.AuthenticationFailed(f"Authentication Failed: {str(e)}")
-        return None
         
 def create_access_token(user_id):
     """
@@ -145,7 +88,6 @@ def create_refresh_token(user_id):
     }
     # Encoding the payload with a secret key and specifying HS256 as the algorithm
     return jwt.encode(payload, JWT_REFRESH_SECRET, algorithm="HS256")
-
 
 def decode_refresh_token(token):
     logger.info(f"Decoding refresh token: {token}")  
@@ -214,3 +156,60 @@ def decode_temporary_token(token):
     except Exception as e:
         logger.error(f"{RED}Unexpected error decoding temporary token: {e}{END}")
         raise exceptions.AuthenticationFailed(f"Token cannot be decoded: {str(e)}")
+    
+class JWTAuthentication(BaseAuthentication):
+    """
+    Custom authentication class that handles JWT authentication.
+
+    This class authenticates requests by extracting and validating a JWT from the Authorization header.
+    It checks the token's validity, decodes it to extract the user ID, and fetches the corresponding user
+    object from the database.
+
+    Attributes:
+        None
+
+    Methods:
+        authenticate(request): Attempts to authenticate a request based on a JWT in the Authorization header.
+    """
+
+    def authenticate(self, request):
+        """
+        Authenticate the incoming request by checking for a JWT in the 'Authorization' header.
+
+        This method splits the Authorization header to extract the JWT, verifies its validity,
+        and attempts to fetch the corresponding user from the database.
+
+        Parameters:
+            request (HttpRequest): The HttpRequest object.
+
+        Returns:
+            tuple: A tuple of (User, token) if authentication is successful, None otherwise.
+
+        Raises:
+            AuthenticationFailed: If the token is expired, invalid, or if the user does not exist.
+        """
+        auth_header = get_authorization_header(request).decode("utf-8")
+        if not auth_header:
+            return None
+
+        auth = auth_header.split()
+        if auth and len(auth) == 2 and auth[0].lower() == "bearer":
+            token = auth[1]
+            try:
+                user_id = decode_access_token(token)
+                user = User.objects.get(pk=user_id)
+                logger.info(f"User object accessed for user_id={user_id}")
+                return (user, token)
+            except jwt.ExpiredSignatureError:
+                logger.warning("Token has expired")
+                raise exceptions.AuthenticationFailed("Token has expired", code=401)
+            except jwt.InvalidTokenError:
+                logger.error("Invalid token encountered")
+                raise exceptions.AuthenticationFailed("User not found", code=401)
+            except User.DoesNotExist:
+                logger.error(f"User not found for user_id={user_id}")
+                raise exceptions.AuthenticationFailed("User not found", code=401)
+            except Exception as e:
+                logger.error(f"Authentication Failed: {str(e)}")
+                raise exceptions.AuthenticationFailed(f"Authentication Failed: {str(e)}")
+        return None
