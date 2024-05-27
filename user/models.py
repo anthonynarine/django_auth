@@ -1,6 +1,6 @@
 # Standard library imports
 from enum import unique
-from turtle import mode
+
 
 # Third-party imports
 from django.conf import settings
