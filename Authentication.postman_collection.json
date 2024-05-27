@@ -1,6 +1,6 @@
 {
 	"info": {
-		"_postman_id": "5201082d-1c90-4441-8603-dccccf25b1e7",
+		"_postman_id": "237ef4ef-88bc-4b4b-b803-d153f66974b2",
 		"name": "Authentication",
 		"description": "This 'Authentication' collection encompasses all endpoints related to managing user authentication and account operations within our application. It covers user registration, login processes, token refresh, user data access with a token, and account recovery options like password reset.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
@@ -46,11 +46,12 @@
 							"raw": "{\n    \"first_name\": \"John\",\n    \"last_name\": \"Doe\",\n    \"email\": \"john.doe@example.com\",\n    \"password\": \"password123\",\n    \"password_confirm\": \"password123\"\n}"
 						},
 						"url": {
-							"raw": "https://{{base_url}}/api/register/",
+							"raw": "https://localhost:8000/api/register/",
 							"protocol": "https",
 							"host": [
-								"{{base_url}}"
+								"localhost"
 							],
+							"port": "8000",
 							"path": [
 								"api",
 								"register",
@@ -74,7 +75,12 @@
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n    \"email\": \"john.doe@example.com\",\n    \"password\": \"password123\"\n}"
+					"raw": "{\n    \"email\": \"john.doe@example.com\",\n    \"password\": \"password123\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
 				},
 				"url": {
 					"raw": "https://{{base_url}}/api/login/",
@@ -101,11 +107,12 @@
 							"raw": "{\n    \"email\": \"john.doe@example.com\",\n    \"password\": \"password123\"\n}"
 						},
 						"url": {
-							"raw": "https://{{base_url}}/api/login/",
+							"raw": "https://localhost:8000/api/login/",
 							"protocol": "https",
 							"host": [
-								"{{base_url}}"
+								"localhost"
 							],
+							"port": "8000",
 							"path": [
 								"api",
 								"login",
@@ -160,11 +167,12 @@
 							}
 						],
 						"url": {
-							"raw": "https://{{base_url}}/api/user/",
+							"raw": "https://localhost:8000/api/user/",
 							"protocol": "https",
 							"host": [
-								"{{base_url}}"
+								"localhost"
 							],
+							"port": "8000",
 							"path": [
 								"api",
 								"user",
@@ -207,11 +215,12 @@
 						"method": "POST",
 						"header": [],
 						"url": {
-							"raw": "https://{{base_url}}/api/token-refresh/",
+							"raw": "https://localhost:8000/api/token-refresh/",
 							"protocol": "https",
 							"host": [
-								"{{base_url}}"
+								"localhost"
 							],
+							"port": "8000",
 							"path": [
 								"api",
 								"token-refresh",
@@ -235,13 +244,13 @@
 				"header": [
 					{
 						"key": "Authorization",
-						"value": "Bearer {{access_token}}",
-						"type": "text"
+						"value": "",
+						"disabled": true
 					}
 				],
 				"url": {
-					"raw": "https://{{base_url}}/api/logout/",
-					"protocol": "https",
+					"raw": "http://{{base_url}}/api/logout/",
+					"protocol": "http",
 					"host": [
 						"{{base_url}}"
 					],
@@ -249,7 +258,7 @@
 						"api",
 						"logout",
 						""
-					]
+						]
 				},
 				"description": "Logs out the user from the application by invalidating their current access token."
 			},
@@ -266,11 +275,12 @@
 							}
 						],
 						"url": {
-							"raw": "https://{{base_url}}/api/logout/",
+							"raw": "https://localhost:8000/api/logout/",
 							"protocol": "https",
 							"host": [
-								"{{base_url}}"
+								"localhost"
 							],
+							"port": "8000",
 							"path": [
 								"api",
 								"logout",
@@ -294,11 +304,16 @@
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n    \"email\": \"john.doe@example.com\"\n}"
+					"raw": "{\n    \"email\": \"john.doe@example.com\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
 				},
 				"url": {
-					"raw": "https://{{base_url}}/api/forgot-password/",
-					"protocol": "https",
+					"raw": "http://{{base_url}}/api/forgot-password/",
+					"protocol": "http",
 					"host": [
 						"{{base_url}}"
 					],
@@ -317,11 +332,12 @@
 						"method": "POST",
 						"header": [],
 						"url": {
-							"raw": "https://{{base_url}}/api/forgot-password/",
+							"raw": "https://localhost:8000/api/forgot-password/",
 							"protocol": "https",
 							"host": [
-								"{{base_url}}"
+								"localhost"
 							],
+							"port": "8000",
 							"path": [
 								"api",
 								"forgot-password",
@@ -345,11 +361,16 @@
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n    \"token\": \"validTokenExample\",\n    \"password\": \"newStrongPassword123\",\n    \"password_confirm\": \"newStrongPassword123\"\n}"
+					"raw": "{\n    \"token\": \"validTokenExample\",\n    \"password\": \"newStrongPassword123\",\n    \"password_confirm\": \"newStrongPassword123\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
 				},
 				"url": {
-					"raw": "https://{{base_url}}/api/reset-password/",
-					"protocol": "https",
+					"raw": "http://{{base_url}}/api/reset-password/",
+					"protocol": "http",
 					"host": [
 						"{{base_url}}"
 					],
@@ -368,11 +389,12 @@
 						"method": "POST",
 						"header": [],
 						"url": {
-							"raw": "https://{{base_url}}/api/reset-password/",
+							"raw": "https://localhost:8000/api/reset-password/",
 							"protocol": "https",
 							"host": [
-								"{{base_url}}"
+								"localhost"
 							],
+							"port": "8000",
 							"path": [
 								"api",
 								"reset-password",
@@ -386,6 +408,122 @@
 					"header": [],
 					"cookie": [],
 					"body": "{\n    \"message\": \"Password has been reset successfully.\"\n}"
+				}
+			]
+		},
+		{
+			"name": "TEST_CSRF_EXEMPT",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "http://{{base_url}}/api/test-csrf-exempt/",
+					"protocol": "http",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"test-csrf-exempt",
+						""
+					]
+				}
+			},
+			"response": [
+				{
+					"name": "CSRF Exempt View Works",
+					"originalRequest": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "https://localhost:8000/api/test-csrf-exempt/",
+							"protocol": "https",
+							"host": [
+								"localhost"
+							],
+							"port": "8000",
+							"path": [
+								"api",
+								"test-csrf-exempt",
+								""
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "Text",
+					"header": [],
+					"cookie": [],
+					"body": "{\n    \"message\": \"CSRF exempt view works\"\n}"
+				}
+			]
+		},
+		{
+			"name": "Toggle_2FA",
+			"request": {
+				"method": "PATCH",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxMjQsImV4cCI6MTcxNjc2NDk2NCwiaWF0IjoxNzE2NzYzNzY0fQ.4dTiRgRhK3z4hDy0Jqbw9IRFW-pQvthD39F0M9_UR0A"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"is_2fa_enabled\": false\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://{{base_url}}/api/user/toggle-2fa/",
+					"protocol": "http",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"user",
+						"toggle-2fa",
+						""
+					]
+				},
+				"description": "Toggles the two-factor authentication setting for the user."
+			},
+			"response": [
+				{
+					"name": "2FA Toggled Successfully",
+					"originalRequest": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxMjQsImV4cCI6MTcxNjc2NDk2NCwiaWF0IjoxNzE2NzYzNzY0fQ.4dTiRgRhK3z4hDy0Jqbw9IRFW-pQvthD39F0M9_UR0A"
+							}
+						],
+						"url": {
+							"raw": "https://localhost:8000/api/user/toggle-2fa/",
+							"protocol": "https",
+							"host": [
+								"localhost"
+							],
+							"port": "8000",
+							"path": [
+								"api",
+								"user",
+								"toggle-2fa",
+								""
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "Text",
+					"header": [],
+					"cookie": [],
+					"body": "{\n    \"is_2fa_enabled\": false\n}"
 				}
 			]
 		}
