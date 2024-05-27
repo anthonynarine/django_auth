@@ -194,15 +194,17 @@ AUTH_PASSWORD_VALIDATORS = [
             'min_length': 8,
         },
     },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-        'OPTIONS': {
-            'password_list_path': 'D:/react-django/django_auth/auth_venv/Lib/site-packages/django/contrib/auth/common-passwords.txt.gz',
-        },
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    # TODO  impliment a way to add common pw  validators. 
+    
+    # {
+    #     'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+    #     'OPTIONS': {
+    #         'password_list_path': 'D:/react-django/django_auth/auth_venv/Lib/site-packages/django/contrib/auth/common-passwords.txt.gz',
+    #     },
+    # },
+    # {
+    #     'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+    # },
 ]
 
 
