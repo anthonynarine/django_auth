@@ -131,8 +131,8 @@ CSRF_TRUSTED_ORIGINS = [
 
 
 # JWT Secretes
-JWT_ACCESS_SECRET = config('JWT_ACCESS_SECRET')
 JWT_REFRESH_SECRET = config('JWT_REFRESH_SECRET')
+JWT_ACCESS_SECRET = config('JWT_ACCESS_SECRET', default='')
 
 if not JWT_ACCESS_SECRET or not JWT_REFRESH_SECRET:
     print('JWT secrets are not set. Application is shutting down.')
@@ -179,6 +179,8 @@ logging.config.dictConfig(LOGGING)
 
 # Email Settings
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL")
+EMAIL_BACKEND = 'sendgrid_backend.SendgridBackend'
+SENDGRID_API_KEY = config("SENDGRID_API_KEY")
 
 AUTH_PASSWORD_VALIDATORS = [
     {
