@@ -5,6 +5,7 @@ import email
 from io import BytesIO
 import logging
 import os
+from re import DEBUG
 from urllib import request, response
 from decouple import config
 
@@ -211,8 +212,9 @@ class LoginAPIView(APIView):
                 response.set_cookie(
                     "temp_token", temp_token, max_age=600,  # Token expires in 10 minutes
                     httponly=True,  # Cookie is not accessible via JavaScript (helps prevent XSS attacks)
-                    secure=True,  # Cookie is only sent over HTTPS (secures data in transit)
-                    samesite="Lax"  # Cookie is not sent on cross-origin requests (mitigates CSRF risks)
+                    secure=not DEBUG,  # when DEBUG is false (is the case for production) secure will = True
+                    samesite="None"  
+                    # Sets the temporary token as a cookie. Only sent over HTTPS in production and allows cross-site requests.
                 )
                 logger.info(f"2FA required for user {email}. Temporary token issued.")
                 return response
@@ -231,14 +233,20 @@ class LoginAPIView(APIView):
                 expired_at=timezone.now() + timedelta(days=7)
             )
             response = Response({
-                "message": "Logged in successfully.",
-                "access_token": access_token
-            }, status=status.HTTP_200_OK)
+                "message": "Logged in successfully."}, status=status.HTTP_200_OK)
+            response.set_cookie(
+                "access_token", access_token, max_age=9000,
+                httponly=True,
+                secure=not DEBUG,  # when DEBUG is false (is the case for production) secure will = True
+                samesite="None"  
+                # Sets the access token as a cookie. Only sent over HTTPS in production and allows cross-site requests.  
+            )
             response.set_cookie(
                 "refresh_token", refresh_token, max_age=604800,  # Cookie expires in 7 days
                 httponly=True,  # Cookie is not accessible via JavaScript (helps prevent XSS attacks)
-                secure=True,  # Cookie is only sent over HTTPS (secures data in transit)
-                samesite='Strict'  # Cookie is not sent on cross-origin requests (strong mitigation against CSRF)
+                secure=not DEBUG,  # when DEBUG is false (is the case for production) secure will = True
+                samesite='Strict'  
+                # Sets the refresh token as a cookie. Only sent over HTTPS in production and does not allow cross-site requests.
             )
             # Set CSRF token in the cookie for additional security.
             # csrf_token = get_token(request)
@@ -253,7 +261,6 @@ class LoginAPIView(APIView):
 
     
 class TwoFactorLoginAPIView(APIView):
-    
     """
     Handles the verification of the second factor for users with 2FA enabled.
     """
@@ -264,11 +271,11 @@ class TwoFactorLoginAPIView(APIView):
         If successful, generates access and refresh tokens.
         """
         data = request.data
-        otp = data.get("otp") # Extract the OTP from the request data
-        temp_token = request.COOKIES.get("temp_token") # Get the temporary token from cookies
+        otp = data.get("otp")  # Extract the OTP from the request data
+        temp_token = request.COOKIES.get("temp_token")  # Get the temporary token from cookies
         
         # Log the received OTP and temp_token
-        logger.debug(f"Receied OTP: {otp}")
+        logger.debug(f"Received OTP: {otp}")
         logger.debug(f"Received temp_token: {temp_token}")
         
         # Check if both OTP and temporary token are provided
@@ -308,21 +315,40 @@ class TwoFactorLoginAPIView(APIView):
             logger.debug(f"Refresh token created: {refresh_token}") 
             
             # Store the refresh token in the database with an expiration date
-            UserToken.objects.create(user_id=user.id, token=refresh_token, expired_at=timezone.now() + timedelta(days=7))
+            UserToken.objects.create(
+                user_id=user.id,
+                token=refresh_token,
+                expired_at=timezone.now() + timedelta(days=7)
+            )
             logger.debug(f"Refresh token stored in DB for user_id: {user.id}")  
             
             csrf_token = get_token(request)
             
             # Create the response with the access token
-            response = Response({"access_token": access_token})
-            # Set the refresh toke as an HTTP-only cookie
-            response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=True, samesite="Strict")
+            response = Response({"message": "2FA verification successful"})
+            # Set the access token as an HTTP-only cookie
+            response.set_cookie(
+                key="access_token",
+                value=access_token,
+                httponly=True,
+                secure=not DEBUG,  # when DEBUG is false (is the case for production) secure will = True
+                samesite="None"  
+            )
+            # Set the refresh token as an HTTP-only cookie
+            response.set_cookie(
+                key="refresh_token",
+                value=refresh_token,
+                httponly=True,
+                secure=not DEBUG,  # when DEBUG is false (is the case for production) secure will = True
+                samesite="None"  
+            )
             # Set the CSRF token as a cookie
             response.set_cookie("csrftoken", csrf_token, httponly=False, secure=True, samesite='Strict')
             return response
         else:
             logger.warning("Invalid OTP")
             raise exceptions.AuthenticationFailed("Authentication failed.")
+
 
 class GenerateQRCodeAPIView(APIView):
     """
