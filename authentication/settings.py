@@ -13,10 +13,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Security settings
 SECRET_KEY = config('SECRET_KEY')
 DEBUG = config('DEBUG', default=True, cast=bool)
-ALLOWED_HOSTS = ['ant-django-auth-62cf01255868.herokuapp.com', 'localhost', '127.0.0.1', "localhost:3000"]
+
+ALLOWED_HOSTS = [
+    'ant-django-auth-62cf01255868.herokuapp.com',
+    'localhost', '127.0.0.1',
+    "localhost:3000"]
+
 # Decide which React app base URL to use based on DEBUG
 REACT_APP_BASE_URL = config('REACT_APP_BASE_URL_DEV') if DEBUG else config('REACT_APP_BASE_URL_PROD')
-JWT_ACCESS_SECRET = config('JWT_ACCESS_SECRET', default='')
+
 
 # Application definition
 
@@ -209,6 +214,29 @@ AUTH_PASSWORD_VALIDATORS = [
     # },
 ]
 
+CSRF_COOKIE_SECURE = not DEBUG
+# Ensures the CSRF cookie is only sent over HTTPS in production
+
+SESSION_COOKIE_SECURE = not DEBUG
+# Ensures the session cookie is only sent over HTTPS in production
+
+CSRF_COOKIE_SAMESITE = "None"
+# Allows the CSRF cookie to be sent in cross-site requests
+
+SESSION_COOKIE_SAMESITE = "None"
+# Allows the session cookie to be sent in cross-site request
+
+CSRF_COOKIE_HTTPONLY = False  
+# Ensures the CSRF cookie is accessible to JavaScript for inclusion in AJAX requests
+
+SECURE_SSL_REDIRECT = not DEBUG
+# Redirects all HTTP requests to HTTPS in production
+
+SECURE_BROWSER_XSS_FILTER = True
+# Enables browser's built-in XSS (Cross-Site Scripting) protection and blocks rendering if an XSS attack is detected. 
+
+X_FRAME_OPTIONS = 'DENY'
+# Ensures that your application cannot be embedded in a frame, protecting users from deceptive UI tricks.
 
 # Heroku Deployment Integration
 django_heroku.settings(locals())

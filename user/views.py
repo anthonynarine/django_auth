@@ -304,8 +304,12 @@ class TwoFactorLoginAPIView(APIView):
             access_token = create_access_token(user.id)
             refresh_token = create_refresh_token(user.id)
             
+            logger.debug(f"Access token created: {access_token}")  
+            logger.debug(f"Refresh token created: {refresh_token}") 
+            
             # Store the refresh token in the database with an expiration date
             UserToken.objects.create(user_id=user.id, token=refresh_token, expired_at=timezone.now() + timedelta(days=7))
+            logger.debug(f"Refresh token stored in DB for user_id: {user.id}")  
             
             csrf_token = get_token(request)
             
