@@ -124,6 +124,7 @@ AUTH_PASSWORD_VALIDATORS = [
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:3001",
+    "https://ant-django-auth-62cf01255868.herokuapp.com",
     # Additional origins...
 ]
 CORS_ALLOW_CREDENTIALS = True
