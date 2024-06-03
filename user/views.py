@@ -379,19 +379,35 @@ class ValidateSessionAPIView(APIView):
     authentication_classes = [JWTAuthentication]
 
     def get(self, request):
+        # Log the headers to see if the Authorization header is present
+        logger.debug(f"Request headers: {request.headers}")
+        
         # Check if the request.user is an instance of AnonymousUser
         if isinstance(request.user, AnonymousUser):
             # If so, return a 401 Unauthorized response
+            logger.warning("AnonymousUser detected. Authentication credentials were not provided or are invalid.")
             return Response({"detail": "Authentication credentials were not provided or are invalid."}, 
                             status=status.HTTP_401_UNAUTHORIZED)
+            
+        # Log the authenticated user
+        logger.info(f"Authenticated user: {request.user}")
         
         # If the user is authenticated, proceed to serialize and return the user data
+        user_data = CustomUserSerializer(request.user).data
+        logger.debug(f"User data: {user_data}")
         return Response(CustomUserSerializer(request.user).data)
     
+@method_decorator(csrf_exempt, name="dispatch")
 class RefreshAPIView(APIView):
+    
     def post(self, request):
         refresh_token = request.COOKIES.get("refresh_token")
         user_id = decode_refresh_token(refresh_token)
+        
+        # Log the received refresh token and user_id
+        logger.debug(f"Received refresh token: {refresh_token}")  
+        logger.debug(f"Decoded user ID: {user_id}") 
+        
         if not UserToken.objects.filter(
             user=user_id,
             token=refresh_token,
@@ -400,9 +416,20 @@ class RefreshAPIView(APIView):
             raise exceptions.AuthenticationFailed("unauthenticated")
         
         access_token = create_access_token(user_id)
-        return Response({
-            "access token": access_token
-        })
+        logger.debug(f"New access token created: {access_token}") 
+        
+        response = Response({"message": "Token refreshed successfully"})
+        response.set_cookie(
+            key="access_token",
+            value=access_token,
+            httponly=True,
+            secure=not DEBUG,
+            samesite="None"
+        )
+        
+        return response
+        
+
         
 @method_decorator(csrf_exempt, name='dispatch')        
 class LogoutAPIView(APIView):
