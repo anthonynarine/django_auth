@@ -84,12 +84,12 @@ class TokenAuthenticationMiddleware(MiddlewareMixin):
             return self.get_response(request)
 
         # Attempt to retrieve the "accessToken" from the reequest cookies
-        token = request.COOKIES.get("accessToken")
+        token = request.COOKIES.get("access_token")
         
         # If the toke is not found in the cookies, check the Authrozation header
         if not token:
             auth_header = request.headers.get("Authorization")
-            logger.debug(f"Authorization header: {auth_header}") 
+            # logger.debug(f"Authorization header: {auth_header}") 
             if auth_header and auth_header.startswith("Bearer"):
                 # Extract the token fromt he "Bearer" <Token> format
                 token = auth_header.split(" ")[1]

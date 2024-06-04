@@ -215,29 +215,39 @@ AUTH_PASSWORD_VALIDATORS = [
     # },
 ]
 
-CSRF_COOKIE_SECURE = not DEBUG
-# Ensures the CSRF cookie is only sent over HTTPS in production
+# CSRF_COOKIE_SECURE = not DEBUG
+# # Ensures the CSRF cookie is only sent over HTTPS in production
 
 SESSION_COOKIE_SECURE = not DEBUG
 # Ensures the session cookie is only sent over HTTPS in production
 
-CSRF_COOKIE_SAMESITE = "None"
-# Allows the CSRF cookie to be sent in cross-site requests
+# CSRF_COOKIE_SAMESITE = "None"
+# # Allows the CSRF cookie to be sent in cross-site requests
 
-SESSION_COOKIE_SAMESITE = "None"
-# Allows the session cookie to be sent in cross-site request
+# SESSION_COOKIE_SAMESITE = "None"
+# # Allows the session cookie to be sent in cross-site request
 
-CSRF_COOKIE_HTTPONLY = False  
-# Ensures the CSRF cookie is accessible to JavaScript for inclusion in AJAX requests
+# CSRF_COOKIE_HTTPONLY = False  
+# # Ensures the CSRF cookie is accessible to JavaScript for inclusion in AJAX requests
 
-SECURE_SSL_REDIRECT = not DEBUG
-# Redirects all HTTP requests to HTTPS in production
+# SECURE_SSL_REDIRECT = not DEBUG
+# # Redirects all HTTP requests to HTTPS in production
 
 SECURE_BROWSER_XSS_FILTER = True
 # Enables browser's built-in XSS (Cross-Site Scripting) protection and blocks rendering if an XSS attack is detected. 
 
 X_FRAME_OPTIONS = 'DENY'
 # Ensures that your application cannot be embedded in a frame, protecting users from deceptive UI tricks.
+
+# Dynamic SameSite attribute based on enviroment
+if DEBUG:
+    ACCESS_TOKEN_SAMESITE = "None"
+    REFRESH_TOKEN_SAMESITE = "None"
+else:
+    ACCESS_TOKEN_SAMESITE = "Strict"
+    REFRESH_TOKEN_SAMESITE = "Strict"
+    
+    # Allows the CSRF
 
 # Heroku Deployment Integration
 django_heroku.settings(locals())

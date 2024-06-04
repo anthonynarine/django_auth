@@ -1,12 +1,9 @@
 # Standard library imports
 from datetime import timedelta
-import datetime
-import email
 from io import BytesIO
 import logging
 import os
-from re import DEBUG
-from urllib import request, response
+ 
 from decouple import config
 
 # Third-party imports
@@ -25,7 +22,6 @@ from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.db import transaction
 from django.db import IntegrityError
-import jwt
 from rest_framework import exceptions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -45,14 +41,14 @@ import qrcode
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 
+from authentication.settings import ACCESS_TOKEN_SAMESITE, REFRESH_TOKEN_SAMESITE
+
 # Local application/library specific imports
 from .auth_token import JWT_ACCESS_SECRET, create_access_token, create_refresh_token, decode_refresh_token, JWTAuthentication, create_temporary_2fa_token, decode_temporary_token
 from .models import CustomUser, TemporarySecurityToken, UserToken, Reset
 from .serializers import CustomUserSerializer
 from django.http import HttpResponse
 from django.conf import settings
-
-from user import serializers
 
 User = get_user_model()
 print(User)
@@ -69,6 +65,8 @@ logger = logging.getLogger(__name__)
 RED = '\033[91m'
 GREEN = '\033[92m'
 END = '\033[0m'
+
+logger.debug("DEBUG mode is: %s", settings.DEBUG)
 
 
 @method_decorator(csrf_exempt, name='dispatch')
@@ -212,8 +210,8 @@ class LoginAPIView(APIView):
                 response.set_cookie(
                     "temp_token", temp_token, max_age=600,  # Token expires in 10 minutes
                     httponly=True,  # Cookie is not accessible via JavaScript (helps prevent XSS attacks)
-                    secure=not DEBUG,  # when DEBUG is false (is the case for production) secure will = True
-                    samesite="None"  
+                    secure=not settings.DEBUG,  # when DEBUG is false (is the case for production) secure will = True
+                    samesite="Lax"  
                     # Sets the temporary token as a cookie. Only sent over HTTPS in production and allows cross-site requests.
                 )
                 logger.info(f"2FA required for user {email}. Temporary token issued.")
@@ -234,18 +232,23 @@ class LoginAPIView(APIView):
             )
             response = Response({
                 "message": "Logged in successfully."}, status=status.HTTP_200_OK)
+            
+            # Add debug logs to ensure tokens are being generated correctly
+            logger.debug(f"Access Token created: {access_token}")
+            logger.debug(f"Refresh Token created: {refresh_token}")
+            
             response.set_cookie(
                 "access_token", access_token, max_age=9000,
                 httponly=True,
-                secure=not DEBUG,  # when DEBUG is false (is the case for production) secure will = True
-                samesite="None"  
+                secure=not settings.DEBUG,  # when DEBUG is false (is the case for production) secure will = True
+                samesite="Lax"
                 # Sets the access token as a cookie. Only sent over HTTPS in production and allows cross-site requests.  
             )
             response.set_cookie(
                 "refresh_token", refresh_token, max_age=604800,  # Cookie expires in 7 days
                 httponly=True,  # Cookie is not accessible via JavaScript (helps prevent XSS attacks)
-                secure=not DEBUG,  # when DEBUG is false (is the case for production) secure will = True
-                samesite='Strict'  
+                secure=not settings.DEBUG,  # when DEBUG is false (is the case for production) secure will = True
+                samesite="Lax"
                 # Sets the refresh token as a cookie. Only sent over HTTPS in production and does not allow cross-site requests.
             )
             # Set CSRF token in the cookie for additional security.
@@ -331,16 +334,16 @@ class TwoFactorLoginAPIView(APIView):
                 key="access_token",
                 value=access_token,
                 httponly=True,
-                secure=not DEBUG,  # when DEBUG is false (is the case for production) secure will = True
-                samesite="None"  
+                secure=not settings.DEBUG,  # when DEBUG is false (is the case for production) secure will = True
+                samesite="ACCESS_TOKEN_SAMESITE" 
             )
             # Set the refresh token as an HTTP-only cookie
             response.set_cookie(
                 key="refresh_token",
                 value=refresh_token,
                 httponly=True,
-                secure=not DEBUG,  # when DEBUG is false (is the case for production) secure will = True
-                samesite="None"  
+                secure=not settings.DEBUG,  # when DEBUG is false (is the case for production) secure will = True
+                samesite=REFRESH_TOKEN_SAMESITE
             )
             # Set the CSRF token as a cookie
             response.set_cookie("csrftoken", csrf_token, httponly=False, secure=True, samesite='Strict')
@@ -423,14 +426,11 @@ class RefreshAPIView(APIView):
             key="access_token",
             value=access_token,
             httponly=True,
-            secure=not DEBUG,
-            samesite="None"
+            secure=not settings.DEBUG,
+            samesite=REFRESH_TOKEN_SAMESITE
         )
         
         return response
-        
-
-        
 @method_decorator(csrf_exempt, name='dispatch')        
 class LogoutAPIView(APIView):
     def post(self, request):
@@ -439,6 +439,7 @@ class LogoutAPIView(APIView):
         UserToken.objects.filter(token=refresh_token).delete()
         
         response = Response()
+        response.delete_cookie(key="access_token")
         response.delete_cookie(key="refresh_token")
         response.delete_cookie(key="csrftoken")
         response.delete_cookie(key="temp_token")
@@ -631,13 +632,19 @@ class Verify2FASetupAPIView(APIView):
                     )
                     
                     # Preapte and send the response with the new tokens
+                    # TODO send in cookie not in response body
                     response = Response({
                         "message": "2FA setup complete, new tokens issued",
                         "access_token": new_access_token, 
                     }, status=status.HTTP_200_OK)
                     
                     # Set Refresh toke as HttpOnly cookie
-                    response.set_cookie("refresh_token", new_refresh_token, httponly=True, secure=True, samesite="Strict")
+            
+                    response.set_cookie(
+                        "refresh_token", new_refresh_token,
+                        httponly=True,
+                        secure=True,
+                        samesite="Strict")
                     
                     # Set CSRF token (this is good security practice see below for notes on get_token())
                     csrf_token = get_token(request)
@@ -654,7 +661,7 @@ class Verify2FASetupAPIView(APIView):
             return Response({"error": {"unexpected": "An unexpected error occurred. Please try again later."}}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-        """"
+        """
         Django CSRF Token Handling (see line 495 - verify2FASetupAPIView)
         get_token(request): This function is part of Django's CSRF protection mechanism.
         When called, it checks for an existing CSRF token associated with the user's session.

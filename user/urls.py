@@ -30,4 +30,4 @@ urlpatterns = [
     
 ]
 
-print("User URL patterns:", urlpatterns)
+# print("User URL patterns:", urlpatterns)
