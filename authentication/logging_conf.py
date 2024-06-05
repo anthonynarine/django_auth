@@ -1,7 +1,7 @@
 import logging.config
 import colorlog
 
-def julia_fiesta_logs():
+def julia_fiesta_logs():   
     logging_config = {
         'version': 1,
         'disable_existing_loggers': False,

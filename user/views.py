@@ -207,13 +207,7 @@ class LoginAPIView(APIView):
                 # Create a temporary token specifically for 2FA verification
                 temp_token = create_temporary_2fa_token(user.id)
                 response = Response({'message': '2FA required', '2fa_required': True}, status=status.HTTP_401_UNAUTHORIZED)
-                response.set_cookie(
-                    "temp_token", temp_token, max_age=600,  # Token expires in 10 minutes
-                    httponly=True,  # Cookie is not accessible via JavaScript (helps prevent XSS attacks)
-                    secure=not settings.DEBUG,  # when DEBUG is false (is the case for production) secure will = True
-                    samesite="Lax"  
-                    # Sets the temporary token as a cookie. Only sent over HTTPS in production and allows cross-site requests.
-                )
+                response.set_cookie("temp_token", temp_token, max_age=600,) # Token expires in 10 minutes
                 logger.info(f"2FA required for user {email}. Temporary token issued.")
                 return response
             except Exception as e:
@@ -237,23 +231,8 @@ class LoginAPIView(APIView):
             logger.debug(f"Access Token created: {access_token}")
             logger.debug(f"Refresh Token created: {refresh_token}")
             
-            response.set_cookie(
-                "access_token", access_token, max_age=9000,
-                httponly=not settings.DEBUG, # Cookie is not accessible via JavaScript if True (helps prevent XSS attacks)
-                secure=not settings.DEBUG, # False in production, True in development
-                samesite='Lax' if settings.DEBUG else 'Strict'
-                # Sets the access token as a cookie. Only sent over HTTPS in production and allows cross-site requests.  
-            )
-            response.set_cookie(
-                "refresh_token", refresh_token, max_age=604800,  # Cookie expires in 7 days
-                httponly=not settings.DEBUG,  # Cookie is not accessible via JavaScript if True (helps prevent XSS attacks)
-                secure=not settings.DEBUG, # False in production, True in development 
-                samesite='Lax' if settings.DEBUG else 'Strict'
-                # Sets the refresh token as a cookie. Only sent over HTTPS in production and does not allow cross-site requests.
-            )
-            # Set CSRF token in the cookie for additional security.
-            # csrf_token = get_token(request)
-            # response.set_cookie("csrftoken", csrf_token, httponly=False, secure=True, samesite="Strict")
+            response.set_cookie(key="access_token", value=access_token, max_age=9000)
+            response.set_cookie(key="refresh_token", value=refresh_token, max_age=604800)  # Cookie expires in 7 days
             
             logger.info(f"Successful login for {email}. Full access tokens created and sent.")
             return response
@@ -330,21 +309,9 @@ class TwoFactorLoginAPIView(APIView):
             # Create the response with the access token
             response = Response({"message": "2FA verification successful"})
             # Set the access token as an HTTP-only cookie
-            response.set_cookie(
-                key="access_token",
-                value=access_token,
-                httponly=not settings.DEBUG,  # Cookie is not accessible via JavaScript if True (helps prevent XSS attacks)
-                secure=not settings.DEBUG, # False in production, True in development 
-                samesite='Lax' if settings.DEBUG else 'Strict'
-            )
+            response.set_cookie(key="access_token", value=access_token,)
             # Set the refresh token as an HTTP-only cookie
-            response.set_cookie(
-                key="refresh_token",
-                value=refresh_token,
-                httponly=not settings.DEBUG,  # Cookie is not accessible via JavaScript if True (helps prevent XSS attacks)
-                secure=not settings.DEBUG, # False in production, True in development 
-                samesite='Lax' if settings.DEBUG else 'Strict'
-            )
+            response.set_cookie(key="refresh_token", value=refresh_token)
             # Set the CSRF token as a cookie
             response.set_cookie("csrftoken", csrf_token, httponly=False, secure=True, samesite='Strict')
             return response
@@ -383,7 +350,7 @@ class ValidateSessionAPIView(APIView):
 
     def get(self, request):
         # Log the headers to see if the Authorization header is present
-        logger.debug(f"Request headers: {request.headers}")
+        # logger.debug(f"Request headers: {request.headers}")
         
         # Check if the request.user is an instance of AnonymousUser
         if isinstance(request.user, AnonymousUser):
@@ -422,13 +389,7 @@ class RefreshAPIView(APIView):
         logger.debug(f"New access token created: {access_token}") 
         
         response = Response({"message": "Token refreshed successfully"})
-        response.set_cookie(
-            key="access_token",
-            value=access_token,
-            httponly=not settings.DEBUG,  # Cookie is not accessible via JavaScript if True (helps prevent XSS attacks)
-            secure=not settings.DEBUG, # False in production, True in development 
-            samesite='Lax' if settings.DEBUG else 'Strict'
-        )
+        response.set_cookie(key="access_token", value=access_token)
         
         return response
 @method_decorator(csrf_exempt, name='dispatch')        
@@ -632,20 +593,9 @@ class Verify2FASetupAPIView(APIView):
                     )
                     
                     # Preapte and send the response with the new tokens
-                    # TODO send in cookie not in response body
-                    response = Response({
-                        "message": "2FA setup complete, new tokens issued",
-                        "access_token": new_access_token, 
-                    }, status=status.HTTP_200_OK)
-                    
-                    # Set Refresh toke as HttpOnly cookie
-            
-                    response.set_cookie(
-                        "refresh_token", new_refresh_token,
-                        httponly=not settings.DEBUG,  # Cookie is not accessible via JavaScript if True (helps prevent XSS attacks)
-                        secure=not settings.DEBUG, # False in production, True in development 
-                        samesite='Lax' if settings.DEBUG else 'Strict'
-                    )
+                    response = Response({"message": "2FA setup complete, new tokens issued"}, status=status.HTTP_200_OK)
+                    response.set_cookie(key="access_token", value=new_access_token,)
+                    response.set_cookie(key="refresh_token", value=new_refresh_token)
                     
                     # Set CSRF token (this is good security practice see below for notes on get_token())
                     csrf_token = get_token(request)
