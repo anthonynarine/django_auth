@@ -52,10 +52,10 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     # 1st custom middleware!!!
-    "user.middleware.TokenAuthenticationMiddleware", 
+    "authentication.custom_middleware.token_auth_middleware.TokenAuthenticationMiddleware", 
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "authentication.disable_csrf_middleware.DisableCSRFMiddleware", 
+    "authentication.custom_middleware.disable_csrf_middleware.DisableCSRFMiddleware", 
 ]
 
 # URL and WSGI Configuration
@@ -144,44 +144,6 @@ if not JWT_ACCESS_SECRET or not JWT_REFRESH_SECRET:
     print('JWT secrets are not set. Application is shutting down.')
     sys.exit(1)
 
-# Logging Configuration
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'verbose': {
-            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
-            'style': '{',
-        },
-    },
-    'handlers': {
-        'console': {
-            'level': 'DEBUG',
-            'class': 'logging.StreamHandler',
-            'formatter': 'verbose',
-        },
-        'file': {
-            'level': 'DEBUG',
-            'class': 'logging.FileHandler',
-            'filename': 'debug.log',
-            'formatter': 'verbose',
-        },
-    },
-    'loggers': {
-        '': {  # root logger
-            'handlers': ['console', 'file'],
-            'level': 'DEBUG',
-            'propagate': True,
-        },
-        '__name__': {
-            'handlers': ['console', 'file'],
-            'level': 'DEBUG',
-            'propagate': False,
-        },
-    },
-}
-
-logging.config.dictConfig(LOGGING)
 
 # Email Settings
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL")
