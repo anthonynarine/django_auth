@@ -7,7 +7,8 @@ def julia_fiesta_logs():
         'disable_existing_loggers': False,
         'formatters': {
             'verbose': {
-                'format': '{log_color}{levelname} {asctime} {filename}:{lineno} {module} {message}',
+                '()': 'colorlog.ColoredFormatter',
+                'format': '{log_color}{levelname}{reset} {yellow}{asctime}{reset} {blue}{filename}:{lineno}{reset} {green}{module}{reset} {purple}{message}',
                 'style': '{',
                 'log_colors': {
                     'DEBUG': 'cyan',
@@ -16,6 +17,16 @@ def julia_fiesta_logs():
                     'ERROR': 'red',
                     'CRITICAL': 'bold_red',
                 },
+                'secondary_log_colors': {
+                    'message': {
+                        'DEBUG': 'bold_cyan',
+                        'INFO': 'bold_green',
+                        'WARNING': 'bold_yellow',
+                        'ERROR': 'bold_red',
+                        'CRITICAL': 'bold_red',
+                    },
+                },
+                'reset': True,
             },
         },
         'handlers': {

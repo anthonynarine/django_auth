@@ -4,8 +4,10 @@ from pathlib import Path
 from decouple import config
 import django_heroku
 import dj_database_url
-import logging.config
+from .logging_conf import julia_fiesta_logs
 
+# Setup logging configurations
+julia_fiesta_logs()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -52,10 +54,13 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     # 1st custom middleware!!!
-    "authentication.custom_middleware.token_auth_middleware.TokenAuthenticationMiddleware", 
+    "authentication.custom_middleware.token_auth.TokenAuthenticationMiddleware", 
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "authentication.custom_middleware.disable_csrf_middleware.DisableCSRFMiddleware", 
+    # 2nd custom middleware!!! im a madman
+    "authentication.custom_middleware.disable_csrf.DisableCSRFMiddleware",
+    # 3rd custom middleware!! this is getting crazy
+    "authentication.custom_middleware.cookie_settings.CookieSettingsMiddleware",
 ]
 
 # URL and WSGI Configuration
