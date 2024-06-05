@@ -218,7 +218,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # CSRF_COOKIE_SECURE = not DEBUG
 # # Ensures the CSRF cookie is only sent over HTTPS in production
 
-SESSION_COOKIE_SECURE = not DEBUG
+# SESSION_COOKIE_SECURE = not DEBUG
 # Ensures the session cookie is only sent over HTTPS in production
 
 # CSRF_COOKIE_SAMESITE = "None"
@@ -233,10 +233,10 @@ SESSION_COOKIE_SECURE = not DEBUG
 # SECURE_SSL_REDIRECT = not DEBUG
 # # Redirects all HTTP requests to HTTPS in production
 
-SECURE_BROWSER_XSS_FILTER = True
+# SECURE_BROWSER_XSS_FILTER = True
 # Enables browser's built-in XSS (Cross-Site Scripting) protection and blocks rendering if an XSS attack is detected. 
 
-X_FRAME_OPTIONS = 'DENY'
+# X_FRAME_OPTIONS = 'DENY'
 # Ensures that your application cannot be embedded in a frame, protecting users from deceptive UI tricks.
 
 # Dynamic SameSite attribute based on enviroment

@@ -239,16 +239,16 @@ class LoginAPIView(APIView):
             
             response.set_cookie(
                 "access_token", access_token, max_age=9000,
-                httponly=True,
-                secure=not settings.DEBUG,  # when DEBUG is false (is the case for production) secure will = True
-                samesite="Lax"
+                httponly=not settings.DEBUG, # Cookie is not accessible via JavaScript if True (helps prevent XSS attacks)
+                secure=not settings.DEBUG, # False in production, True in development
+                samesite='Lax' if settings.DEBUG else 'Strict'
                 # Sets the access token as a cookie. Only sent over HTTPS in production and allows cross-site requests.  
             )
             response.set_cookie(
                 "refresh_token", refresh_token, max_age=604800,  # Cookie expires in 7 days
-                httponly=True,  # Cookie is not accessible via JavaScript (helps prevent XSS attacks)
-                secure=not settings.DEBUG,  # when DEBUG is false (is the case for production) secure will = True
-                samesite="Lax"
+                httponly=not settings.DEBUG,  # Cookie is not accessible via JavaScript if True (helps prevent XSS attacks)
+                secure=not settings.DEBUG, # False in production, True in development 
+                samesite='Lax' if settings.DEBUG else 'Strict'
                 # Sets the refresh token as a cookie. Only sent over HTTPS in production and does not allow cross-site requests.
             )
             # Set CSRF token in the cookie for additional security.
@@ -333,17 +333,17 @@ class TwoFactorLoginAPIView(APIView):
             response.set_cookie(
                 key="access_token",
                 value=access_token,
-                httponly=True,
-                secure=not settings.DEBUG,  # when DEBUG is false (is the case for production) secure will = True
-                samesite="ACCESS_TOKEN_SAMESITE" 
+                httponly=not settings.DEBUG,  # Cookie is not accessible via JavaScript if True (helps prevent XSS attacks)
+                secure=not settings.DEBUG, # False in production, True in development 
+                samesite='Lax' if settings.DEBUG else 'Strict'
             )
             # Set the refresh token as an HTTP-only cookie
             response.set_cookie(
                 key="refresh_token",
                 value=refresh_token,
-                httponly=True,
-                secure=not settings.DEBUG,  # when DEBUG is false (is the case for production) secure will = True
-                samesite=REFRESH_TOKEN_SAMESITE
+                httponly=not settings.DEBUG,  # Cookie is not accessible via JavaScript if True (helps prevent XSS attacks)
+                secure=not settings.DEBUG, # False in production, True in development 
+                samesite='Lax' if settings.DEBUG else 'Strict'
             )
             # Set the CSRF token as a cookie
             response.set_cookie("csrftoken", csrf_token, httponly=False, secure=True, samesite='Strict')
@@ -425,9 +425,9 @@ class RefreshAPIView(APIView):
         response.set_cookie(
             key="access_token",
             value=access_token,
-            httponly=True,
-            secure=not settings.DEBUG,
-            samesite=REFRESH_TOKEN_SAMESITE
+            httponly=not settings.DEBUG,  # Cookie is not accessible via JavaScript if True (helps prevent XSS attacks)
+            secure=not settings.DEBUG, # False in production, True in development 
+            samesite='Lax' if settings.DEBUG else 'Strict'
         )
         
         return response
@@ -642,9 +642,10 @@ class Verify2FASetupAPIView(APIView):
             
                     response.set_cookie(
                         "refresh_token", new_refresh_token,
-                        httponly=True,
-                        secure=True,
-                        samesite="Strict")
+                        httponly=not settings.DEBUG,  # Cookie is not accessible via JavaScript if True (helps prevent XSS attacks)
+                        secure=not settings.DEBUG, # False in production, True in development 
+                        samesite='Lax' if settings.DEBUG else 'Strict'
+                    )
                     
                     # Set CSRF token (this is good security practice see below for notes on get_token())
                     csrf_token = get_token(request)
