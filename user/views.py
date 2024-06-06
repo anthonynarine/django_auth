@@ -3,7 +3,7 @@ from datetime import timedelta
 from io import BytesIO
 import logging
 import os
- 
+
 from decouple import config
 
 # Third-party imports
@@ -74,7 +74,6 @@ class TestCSRFExemptView(APIView):
     def post(self, request):
         return Response({'message': 'CSRF exempt view works'}, status=200)
 
-    
 class RegisterAPIView(APIView):
     def post(self, request):
         """
@@ -241,7 +240,6 @@ class LoginAPIView(APIView):
             logger.error(f"Error creating tokens for user {email}: {str(e)}")
             return Response({'error': 'Unable to create tokens'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    
 class TwoFactorLoginAPIView(APIView):
     """
     Handles the verification of the second factor for users with 2FA enabled.
@@ -318,7 +316,6 @@ class TwoFactorLoginAPIView(APIView):
         else:
             logger.warning("Invalid OTP")
             raise exceptions.AuthenticationFailed("Authentication failed.")
-
 
 class GenerateQRCodeAPIView(APIView):
     """

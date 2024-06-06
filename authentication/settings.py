@@ -88,7 +88,6 @@ TEMPLATES = [
 
 
 # Database Configuration
-
 if os.environ.get("DATABASE_URL"):
     DATABASES = {
         'default': dj_database_url.config(default='sqlite:///db.sqlite3', conn_max_age=600)
@@ -182,29 +181,7 @@ AUTH_PASSWORD_VALIDATORS = [
     # },
 ]
 
-# CSRF_COOKIE_SECURE = not DEBUG
-# # Ensures the CSRF cookie is only sent over HTTPS in production
 
-# SESSION_COOKIE_SECURE = not DEBUG
-# Ensures the session cookie is only sent over HTTPS in production
-
-# CSRF_COOKIE_SAMESITE = "None"
-# # Allows the CSRF cookie to be sent in cross-site requests
-
-# SESSION_COOKIE_SAMESITE = "None"
-# # Allows the session cookie to be sent in cross-site request
-
-# CSRF_COOKIE_HTTPONLY = False  
-# # Ensures the CSRF cookie is accessible to JavaScript for inclusion in AJAX requests
-
-# SECURE_SSL_REDIRECT = not DEBUG
-# # Redirects all HTTP requests to HTTPS in production
-
-# SECURE_BROWSER_XSS_FILTER = True
-# Enables browser's built-in XSS (Cross-Site Scripting) protection and blocks rendering if an XSS attack is detected. 
-
-# X_FRAME_OPTIONS = 'DENY'
-# Ensures that your application cannot be embedded in a frame, protecting users from deceptive UI tricks.
 
 # Dynamic SameSite attribute based on enviroment
 if DEBUG:
