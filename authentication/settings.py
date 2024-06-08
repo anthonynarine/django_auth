@@ -2,6 +2,7 @@ import os
 import sys
 from pathlib import Path
 from decouple import config
+from django.conf import settings
 import django_heroku
 import dj_database_url
 from .logging_conf import julia_fiesta_logs
@@ -181,6 +182,18 @@ AUTH_PASSWORD_VALIDATORS = [
     # },
 ]
 
+if settings.DEBUG:
+    # Development settings
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+    SESSION_COOKIE_SAMESITE = "Lax"
+    CSRF_COOKIE_SAMESITE = "Lax"
+else:
+    #Production settings
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_SAMESITE = "None"
+    CSRF_COOKIE_SAMESITE = "None"
 
 
 # Dynamic SameSite attribute based on enviroment

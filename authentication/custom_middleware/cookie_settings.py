@@ -7,44 +7,45 @@ logger = logging.getLogger(__name__)
 
 class CookieSettingsMiddleware(MiddlewareMixin):
     """
-    Middleware to adjust cookie setting based on the Djanog DEBUG setting.
+    Middleware to adjust cookie settings based on the Django DEBUG setting.
     
-    This middleware inpsects the cookies in the response and modifies certain security attributes
-    for specific cookies: "access_tokens" "refresh_tokens" and "temp_tokens". The adjustments  are 
-    made according to wheater the application is running in develpment (DEBUG=True) or Production (DEBUG=False) mode.
+    This middleware inspects the cookies in the response and modifies certain security attributes
+    for specific cookies: "access_token", "refresh_token", and "temp_token". The adjustments are 
+    made according to whether the application is running in development (DEBUG=True) or production (DEBUG=False) mode.
     
     Attributes:
-        - httponly: Ensures the cookie is not accessible via Javascript. Set to True in production and False in development
-        - secure: Ensures the cookie is only sent over HTTPS. Set to True in production and False in development
+        - httponly: Ensures the cookie is not accessible via Javascript. Set to True.
+        - secure: Ensures the cookie is only sent over HTTPS. Set to True in production.
+        - samesite: Controls if cookies are sent with cross-site requests. Set to 'None'.
     """
     def process_response(self, request, response):
         """
-        Adjust cookie setting in the HTTP response based on the DEBUG setting.
+        Adjust cookie settings in the HTTP response based on the DEBUG setting.
         
-        For each relevant cookie in the response ("access_token", "refresh_token", "temp_token") this method:
+        For each relevant cookie in the response ("access_token", "refresh_token", "temp_token"), this method:
         1. Logs the current setting of each cookie.
-        2. Modifies the "httponly", "secure", and "samesite" attributes based on DEBUG setting. 
-        3. Logs the updated setting of the cookie
+        2. Modifies the "httponly", "secure", and "samesite" attributes.
+        3. Logs the updated setting of the cookie.
         
         Args:
-            request (HttpRequest): The incoming HTTP request. 
-            response (HttpResponse): The outgoing HTTP resonose to be modified
-
+            request (HttpRequest): The incoming HTTP request.
+            response (HttpResponse): The outgoing HTTP response to be modified.
+        
         Returns:
-            HttpResponse: The modified HTTP response with adjusted cookie setting. 
+            HttpResponse: The modified HTTP response with adjusted cookie settings.
         """
         for cookie in response.cookies:
             if cookie in ["access_token", "refresh_token", "temp_token"]:
-                # Log current setting before changing
-                logger.debug(f"Adjusting setting for cookie: {cookie}")
+                # Log current settings before changing
+                logger.debug(f"Adjusting settings for cookie: {cookie}")
                 logger.debug(f"Original httponly: {response.cookies[cookie]['httponly']}")
                 logger.debug(f"Original secure: {response.cookies[cookie]['secure']}")
                 logger.debug(f"Original samesite: {response.cookies[cookie]['samesite']}")
                 
-                # Adjust setting based on DEBUG setting
-                response.cookies[cookie]["httponly"] = not settings.DEBUG # False in production, True in development
-                response.cookies[cookie]["secure"] = not settings.DEBUG   # False in production, True in development
-                response.cookies[cookie]["samesite"] = "Lax" if settings.DEBUG else "Strict"
+                # Adjust settings
+                response.cookies[cookie]["httponly"] = True  # Always True for better security
+                response.cookies[cookie]["secure"] = not settings.DEBUG  # False in development, True in production
+                response.cookies[cookie]["samesite"] = "None"  # Always None for cross-site requests
                 
                 # Log new settings after changing
                 logger.debug(f"Updated httponly: {response.cookies[cookie]['httponly']}")
