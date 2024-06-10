@@ -54,15 +54,15 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
-    # 1st custom middleware!!!
-    "authentication.custom_middleware.token_auth.TokenAuthenticationMiddleware", 
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    # 2nd custom middleware!!! im a madman
+    # 1st custom middleware: Token Authentication
+    "authentication.custom_middleware.token_auth.TokenAuthenticationMiddleware", 
+    # 2nd custom middleware: Disable CSRF
     "authentication.custom_middleware.disable_csrf.DisableCSRFMiddleware",
-    # 3rd custom middleware!! this is getting crazy
+    # 3rd custom middleware: Cookie Settings
     "authentication.custom_middleware.cookie_settings.CookieSettingsMiddleware",
-    # 4th custom middleware!! you're just showing off
+    # 4th custom middleware: JWT Refresh
     "authentication.custom_middleware.jwt_refresh.TokenRefreshMiddleware"
 ]
 

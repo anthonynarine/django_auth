@@ -17,9 +17,6 @@ class TokenRefreshMiddleware(MiddlewareMixin):
     This middleware intercepts each request, checks the validity of the access token,
     and refreshes it if it has expired using the refresh token. The new access token
     is set as an HttpOnly cookie in the response.
-
-    Attributes:
-        None
     """
 
     def process_request(self, request):
@@ -30,7 +27,7 @@ class TokenRefreshMiddleware(MiddlewareMixin):
             request (HttpRequest): The incoming HTTP request.
 
         Returns:
-            HttpResponse or None: Returns a response with a refreshed token if needed, otherwise None.
+            None: Let Django handle the response rendering.
         """
         access_token = request.COOKIES.get("access_token")
         refresh_token = request.COOKIES.get("refresh_token")
@@ -64,8 +61,8 @@ class TokenRefreshMiddleware(MiddlewareMixin):
                         new_refresh_token = create_refresh_token(user_id)
 
                         response = Response({"message": "Token refreshed successfully"})
-                        response.set_cookie(key="access_token", value=new_access_token)
-                        response.set_cookie(key="refresh_token", value=new_refresh_token)
+                        response.set_cookie(key="access_token", value=new_access_token, httponly=True, secure=not settings.DEBUG, samesite='None' if not settings.DEBUG else 'Lax')
+                        response.set_cookie(key="refresh_token", value=new_refresh_token, httponly=True, secure=not settings.DEBUG, samesite='None' if not settings.DEBUG else 'Lax')
 
                         # Update refresh token in the database
                         UserToken.objects.filter(user_id=user_id, token=refresh_token).update(
@@ -74,22 +71,28 @@ class TokenRefreshMiddleware(MiddlewareMixin):
                         request.COOKIES["access_token"] = new_access_token
                         logger.debug(f"New access token set: {new_access_token}")
 
-                        return response
+                        # Attach the refreshed response to the request for later processing
+                        request._refresh_response = response
+                        return None
 
                     except jwt.ExpiredSignatureError:
                         logger.error("Refresh token expired.")
-                        return Response({'detail': 'Refresh token expired'}, status=401)
+                        request._refresh_response = Response({'detail': 'Refresh token expired'}, status=401)
+                        return None
 
                     except jwt.InvalidTokenError:
                         logger.error("Invalid refresh token.")
-                        return Response({'detail': 'Invalid refresh token'}, status=401)
+                        request._refresh_response = Response({'detail': 'Invalid refresh token'}, status=401)
+                        return None
                 else:
                     logger.warning("Refresh token missing.")
-                    return Response({'detail': 'Refresh token missing'}, status=401)
+                    request._refresh_response = Response({'detail': 'Refresh token missing'}, status=401)
+                    return None
 
         logger.warning("Access token missing.")
-        return Response({'detail': 'Access token missing'}, status=401)
-    
+        request._refresh_response = Response({'detail': 'Access token missing'}, status=401)
+        return None
+
     def process_response(self, request, response):
         """
         Process the outgoing response to include refreshed tokens if available.
@@ -102,9 +105,12 @@ class TokenRefreshMiddleware(MiddlewareMixin):
             HttpResponse: The modified HTTP response with refreshed tokens if needed.
         """
         if hasattr(request, '_refresh_response'):
+            logger.debug(f"Returning refreshed response: {request._refresh_response}")
             return request._refresh_response
 
+        logger.debug("Returning original response from view.")
         return response
+
 
         """This approach ensures that the middleware doesn't interfere with requests that 
         don't require token validation (like registration) and lets Django handle the response
