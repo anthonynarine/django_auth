@@ -89,4 +89,26 @@ class TokenRefreshMiddleware(MiddlewareMixin):
 
         logger.warning("Access token missing.")
         return Response({'detail': 'Access token missing'}, status=401)
+    
+    def process_response(self, request, response):
+        """
+        Process the outgoing response to include refreshed tokens if available.
 
+        Args:
+            request (HttpRequest): The incoming HTTP request.
+            response (HttpResponse): The outgoing HTTP response.
+
+        Returns:
+            HttpResponse: The modified HTTP response with refreshed tokens if needed.
+        """
+        if hasattr(request, '_refresh_response'):
+            return request._refresh_response
+
+        return response
+
+        """This approach ensures that the middleware doesn't interfere with requests that 
+        don't require token validation (like registration) and lets Django handle the response
+        rendering properly. It also attaches the refreshed response to the request object, 
+        which is then processed in process_response. This way, the response content is handled
+        correctly, and the registration process can proceed without errors.
+        """
