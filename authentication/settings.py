@@ -62,6 +62,8 @@ MIDDLEWARE = [
     "authentication.custom_middleware.disable_csrf.DisableCSRFMiddleware",
     # 3rd custom middleware!! this is getting crazy
     "authentication.custom_middleware.cookie_settings.CookieSettingsMiddleware",
+    # 4th custom middleware!! you're just showing off
+    "authentication.custom_middleware.jwt_refresh.TokenRefreshMiddleware"
 ]
 
 # URL and WSGI Configuration
