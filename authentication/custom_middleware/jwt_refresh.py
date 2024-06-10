@@ -1,6 +1,7 @@
 from django.utils.deprecation import MiddlewareMixin
 from django.conf import settings
 from rest_framework.response import Response
+from django.template.response import TemplateResponse
 import jwt
 from datetime import datetime, timedelta
 from django.utils import timezone
@@ -107,6 +108,15 @@ class TokenRefreshMiddleware(MiddlewareMixin):
         if hasattr(request, '_refresh_response'):
             logger.debug(f"Returning refreshed response: {request._refresh_response}")
             return request._refresh_response
+
+        # Add new tokens to the response cookies if they exist
+        if hasattr(request, '_new_access_token') and hasattr(request, '_new_refresh_token'):
+            response.set_cookie(key="access_token", value=request._new_access_token)
+            response.set_cookie(key="refresh_token", value=request._new_refresh_token)
+        
+        # Ensure the TemplateResponse is rendered before modifying it
+        if isinstance(response, TemplateResponse):
+            response.render()
 
         logger.debug("Returning original response from view.")
         return response
