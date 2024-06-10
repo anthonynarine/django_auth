@@ -386,7 +386,7 @@ class RefreshAPIView(APIView):
         logger.debug(f"New access token created: {access_token}") 
         
         response = Response({"message": "Token refreshed successfully"})
-        response.set_cookie(key="access_token", value=access_token)
+        response.set_cookie(key="access_token", value=access_token, max_age=9000)
         
         return response
 @method_decorator(csrf_exempt, name='dispatch')        

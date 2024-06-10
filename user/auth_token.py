@@ -44,7 +44,7 @@ def create_access_token(user_id):
     # Payload of the token with user_id, expiration time, and issued at time.
     payload = {
         "user_id": user_id,  # Unique identifier for the user
-        "exp": datetime.now(timezone.utc) + timedelta(minutes=20),  # Token expiration time (20 mins from now)
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=15),  # Token expiration time (20 mins from now)
         "iat": datetime.now(timezone.utc)  # Token issue time
     }
     # Encoding the payload with a secret key and specifying HS256 as the algorithm
