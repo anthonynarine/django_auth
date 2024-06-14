@@ -36,7 +36,7 @@ class CookieSettingsMiddleware(MiddlewareMixin):
             HttpResponse: The modified HTTP response with adjusted cookie settings.
         """
         # Determine the domain based on the enviroment
-        domain = "localhoset" if settings.DEBUG else "https://ant-django-auth-62cf01255868.herokuapp.com"
+        domain = "localhoset" if settings.DEBUG else "ant-django-auth-62cf01255868.herokuapp.com"
         for cookie in response.cookies:
             if cookie in ["access_token", "refresh_token", "temp_token"]:
                 # Log current settings before changing
