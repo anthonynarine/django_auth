@@ -63,7 +63,7 @@ MIDDLEWARE = [
     # 3rd custom middleware: JWT Refresh
     # "authentication.custom_middleware.jwt_refresh.TokenRefreshMiddleware",
     # 4th custom middleware: Cookie Settings
-    "authentication.custom_middleware.cookie_settings.CookieSettingsMiddleware"
+    # "authentication.custom_middleware.cookie_settings.CookieSettingsMiddleware"
 ]
 
 
@@ -191,16 +191,16 @@ if settings.DEBUG:
     CSRF_COOKIE_SECURE = False
     SESSION_COOKIE_SAMESITE = "Lax"
     CSRF_COOKIE_SAMESITE = "Lax"
-    SESSION_COOKIE_DOMAIN = "localhost"
-    CSRF_COOKIE_DOMAIN = "localhost"
+    # SESSION_COOKIE_DOMAIN = "localhost"
+    # CSRF_COOKIE_DOMAIN = "localhost"
 else:
     #Production settings
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SESSION_COOKIE_SAMESITE = "None"
     CSRF_COOKIE_SAMESITE = "None"
-    SESSION_COOKIE_DOMAIN = ".ant-django-auth-62cf01255868.herokuapp.com"
-    CSRF_COOKIE_DOMAIN = ".ant-django-auth-62cf01255868.herokuapp.com"
+    # SESSION_COOKIE_DOMAIN = ".ant-django-auth-62cf01255868.herokuapp.com"
+    # CSRF_COOKIE_DOMAIN = ".ant-django-auth-62cf01255868.herokuapp.com"
 
 
 # Dynamic SameSite attribute based on enviroment

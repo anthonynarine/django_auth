@@ -224,11 +224,11 @@ class LoginAPIView(APIView):
                 expired_at=timezone.now() + timedelta(days=7)
             )
             response = Response({
-                "message": "Logged in successfully."}, status=status.HTTP_200_OK)
-            
-            response.set_cookie(key="access_token", value=access_token, max_age=900)
-            response.set_cookie(key="refresh_token", value=refresh_token, max_age=604800)  # Cookie expires in 7 days
-            
+                "message": "Logged in successfully.",
+                "access_token": access_token,
+                "refresh_token": refresh_token
+            }, status=status.HTTP_200_OK)
+                        
             # Add debug logs to ensure tokens are being generated correctly
             logger.debug(f"Access Token created: {access_token}")
             logger.debug(f"Refresh Token created: {refresh_token}")
