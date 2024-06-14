@@ -191,12 +191,16 @@ if settings.DEBUG:
     CSRF_COOKIE_SECURE = False
     SESSION_COOKIE_SAMESITE = "Lax"
     CSRF_COOKIE_SAMESITE = "Lax"
+    SESSION_COOKIE_DOMAIN = "localhost"
+    CSRF_COOKIE_DOMAIN = "localhost"
 else:
     #Production settings
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SESSION_COOKIE_SAMESITE = "None"
     CSRF_COOKIE_SAMESITE = "None"
+    SESSION_COOKIE_DOMAIN = ".ant-django-auth-62cf01255868.herokuapp.com"
+    CSRF_COOKIE_DOMAIN = ".ant-django-auth-62cf01255868.herokuapp.com"
 
 
 # Dynamic SameSite attribute based on enviroment
