@@ -226,7 +226,7 @@ class LoginAPIView(APIView):
             response = Response({
                 "message": "Logged in successfully."}, status=status.HTTP_200_OK)
             
-            response.set_cookie(key="access_token", value=access_token, max_age=9000)
+            response.set_cookie(key="access_token", value=access_token, max_age=900)
             response.set_cookie(key="refresh_token", value=refresh_token, max_age=604800)  # Cookie expires in 7 days
             
             # Add debug logs to ensure tokens are being generated correctly
@@ -386,7 +386,7 @@ class RefreshAPIView(APIView):
         logger.debug(f"New access token created: {access_token}") 
         
         response = Response({"message": "Token refreshed successfully"})
-        response.set_cookie(key="access_token", value=access_token, max_age=9000)
+        response.set_cookie(key="access_token", value=access_token, max_age=900)
         
         return response
 @method_decorator(csrf_exempt, name='dispatch')        

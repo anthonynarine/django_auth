@@ -17,6 +17,7 @@ class CookieSettingsMiddleware(MiddlewareMixin):
         - httponly: Ensures the cookie is not accessible via Javascript. Set to True.
         - secure: Ensures the cookie is only sent over HTTPS. Set to True in production.
         - samesite: Controls if cookies are sent with cross-site requests. Set to 'None'.
+        - domain: Sets the domain for the cookie based on the environment.
     """
     def process_response(self, request, response):
         """
@@ -34,6 +35,8 @@ class CookieSettingsMiddleware(MiddlewareMixin):
         Returns:
             HttpResponse: The modified HTTP response with adjusted cookie settings.
         """
+        # Determine the domain based on the enviroment
+        domain = "localhoset" if settings.DEBUG else "https://ant-django-auth-62cf01255868.herokuapp.com"
         for cookie in response.cookies:
             if cookie in ["access_token", "refresh_token", "temp_token"]:
                 # Log current settings before changing
@@ -41,15 +44,18 @@ class CookieSettingsMiddleware(MiddlewareMixin):
                 logger.debug(f"Original httponly: {response.cookies[cookie]['httponly']}")
                 logger.debug(f"Original secure: {response.cookies[cookie]['secure']}")
                 logger.debug(f"Original samesite: {response.cookies[cookie]['samesite']}")
+                logger.debug(f"Original domain: {response.cookies[cookie]['domain']}")
                 
                 # Adjust settings
                 response.cookies[cookie]["httponly"] = False  # Set to False for accessibility in JavaScript
                 response.cookies[cookie]["secure"] = not settings.DEBUG  # False in development, True in production
                 response.cookies[cookie]["samesite"] = "None"  # Always None for cross-site requests
+                response.cookies[cookie]["domain"] = domain  # Set the domain based on the environment
                 
                 # Log new settings after changing
                 logger.debug(f"Updated httponly: {response.cookies[cookie]['httponly']}")
                 logger.debug(f"Updated secure: {response.cookies[cookie]['secure']}")
                 logger.debug(f"Updated samesite: {response.cookies[cookie]['samesite']}")
+                logger.debug(f"Updated domain: {response.cookies[cookie]['domain']}")
                 
         return response
