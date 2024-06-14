@@ -43,7 +43,7 @@ class CookieSettingsMiddleware(MiddlewareMixin):
                 logger.debug(f"Original samesite: {response.cookies[cookie]['samesite']}")
                 
                 # Adjust settings
-                response.cookies[cookie]["httponly"] = True  # Always True for better security
+                response.cookies[cookie]["httponly"] = False  # Set to False for accessibility in JavaScript
                 response.cookies[cookie]["secure"] = not settings.DEBUG  # False in development, True in production
                 response.cookies[cookie]["samesite"] = "None"  # Always None for cross-site requests
                 

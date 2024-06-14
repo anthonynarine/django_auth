@@ -61,7 +61,7 @@ MIDDLEWARE = [
     # 2nd custom middleware: Disable CSRF
     "authentication.custom_middleware.disable_csrf.DisableCSRFMiddleware",
     # 3rd custom middleware: JWT Refresh
-    "authentication.custom_middleware.jwt_refresh.TokenRefreshMiddleware",
+    # "authentication.custom_middleware.jwt_refresh.TokenRefreshMiddleware",
     # 4th custom middleware: Cookie Settings
     "authentication.custom_middleware.cookie_settings.CookieSettingsMiddleware"
 ]

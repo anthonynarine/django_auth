@@ -226,12 +226,12 @@ class LoginAPIView(APIView):
             response = Response({
                 "message": "Logged in successfully."}, status=status.HTTP_200_OK)
             
+            response.set_cookie(key="access_token", value=access_token, max_age=9000)
+            response.set_cookie(key="refresh_token", value=refresh_token, max_age=604800)  # Cookie expires in 7 days
+            
             # Add debug logs to ensure tokens are being generated correctly
             logger.debug(f"Access Token created: {access_token}")
             logger.debug(f"Refresh Token created: {refresh_token}")
-            
-            response.set_cookie(key="access_token", value=access_token, max_age=9000)
-            response.set_cookie(key="refresh_token", value=refresh_token, max_age=604800)  # Cookie expires in 7 days
             
             logger.info(f"Successful login for {email}. Full access tokens created and sent.")
             return response
