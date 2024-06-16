@@ -397,10 +397,10 @@ class LogoutAPIView(APIView):
         UserToken.objects.filter(token=refresh_token).delete()
         
         response = Response()
-        response.delete_cookie(key="access_token")
-        response.delete_cookie(key="refresh_token")
-        response.delete_cookie(key="csrftoken")
-        response.delete_cookie(key="temp_token")
+        # response.delete_cookie(key="access_token")
+        # response.delete_cookie(key="refresh_token")
+        # response.delete_cookie(key="csrftoken")
+        # response.delete_cookie(key="temp_token")
         logout(request)
         response.data = {
             "message": "Signed out"
