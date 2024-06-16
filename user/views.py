@@ -397,10 +397,18 @@ class LogoutAPIView(APIView):
         UserToken.objects.filter(token=refresh_token).delete()
         
         response = Response()
-        response.delete_cookie(key="access_token")
-        response.delete_cookie(key="refresh_token")
-        response.delete_cookie(key="csrftoken")
-        response.delete_cookie(key="temp_token")
+        
+        # Correctly delete cookies with matching attributes
+        cookie_args = {
+            "domain": 'ant-django-auth-62cf01255868.herokuapp.com',
+            "path": "/",
+            "samesite": "None",
+            "secure": True
+        }
+        response.delete_cookie(key="access_token", **cookie_args)
+        response.delete_cookie(key="refresh_token", **cookie_args)
+        response.delete_cookie(key="csrftoken", **cookie_args)
+        response.delete_cookie(key="temp_token", **cookie_args)
         logout(request)
         response.data = {
             "message": "Signed out"
