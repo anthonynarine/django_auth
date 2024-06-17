@@ -272,7 +272,7 @@ class TwoFactorLoginAPIView(APIView):
             # Return an error response if the token is invalid or has expired
             return Response({"error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
         
-        #  # Retrieve the user based on the user ID from the temporary token
+        # Retrieve the user based on the user ID from the temporary token
         try:
             user = get_object_or_404(User, id=user_id)
         except Exception as e:
@@ -304,12 +304,12 @@ class TwoFactorLoginAPIView(APIView):
             
             csrf_token = get_token(request)
             
-            # Create the response with the access token
-            response = Response({"message": "2FA verification successful"})
-            # Set the access token as an HTTP-only cookie
-            response.set_cookie(key="access_token", value=access_token,)
-            # Set the refresh token as an HTTP-only cookie
-            response.set_cookie(key="refresh_token", value=refresh_token)
+            response = Response({
+                "message": "2FA verification successful",
+                "access_token": access_token,
+                "refresh_token": refresh_token
+            }, status=status.HTTP_200_OK)
+            
             # Set the CSRF token as a cookie
             response.set_cookie("csrftoken", csrf_token, httponly=False, secure=True, samesite='Strict')
             return response
@@ -385,9 +385,11 @@ class RefreshAPIView(APIView):
         access_token = create_access_token(user_id)
         logger.debug(f"New access token created: {access_token}") 
         
-        response = Response({"message": "Token refreshed successfully"})
-        response.set_cookie(key="access_token", value=access_token, max_age=900)
-        
+        response = Response({
+            "message": "Token refreshed successfully.",
+            "access_token": access_token,
+        }, status=status.HTTP_200_OK)
+                
         return response
 @method_decorator(csrf_exempt, name='dispatch')        
 class LogoutAPIView(APIView):
