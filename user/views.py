@@ -588,9 +588,11 @@ class Verify2FASetupAPIView(APIView):
                     )
                     
                     # Preapte and send the response with the new tokens
-                    response = Response({"message": "2FA setup complete, new tokens issued"}, status=status.HTTP_200_OK)
-                    response.set_cookie(key="access_token", value=new_access_token,)
-                    response.set_cookie(key="refresh_token", value=new_refresh_token)
+                    response = Response({
+                        "message": "2FA setup complete, new tokens issued",
+                        "access_token": new_access_token,
+                        "refresh_token": new_refresh_token
+                    }, status=status.HTTP_200_OK)
                     
                     # Set CSRF token (this is good security practice see below for notes on get_token())
                     csrf_token = get_token(request)
