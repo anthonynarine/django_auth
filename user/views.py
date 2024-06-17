@@ -206,7 +206,7 @@ class LoginAPIView(APIView):
                 # Create a temporary token specifically for 2FA verification
                 temp_token = create_temporary_2fa_token(user.id)
                 response = Response({'message': '2FA required', '2fa_required': True}, status=status.HTTP_401_UNAUTHORIZED)
-                response.set_cookie("temp_token", temp_token, max_age=600,) # Token expires in 10 minutes
+                response.set_cookie("temp_token", temp_token, max_age=600, httponly=True, secure=False, samesite="Lax") # Token expires in 10 minutes
                 logger.info(f"2FA required for user {email}. Temporary token issued.")
                 return response
             except Exception as e:
