@@ -257,6 +257,8 @@ class TwoFactorLoginAPIView(APIView):
         # Log the received OTP and temp_token
         logger.debug(f"Received OTP: {otp}")
         logger.debug(f"Received temp_token: {temp_token}")
+        logger.debug(f"Request cookies: {request.COOKIES}")
+        logger.debug(f"Request headers: {request.headers}")
         
         # Check if both OTP and temporary token are provided
         if not otp or not temp_token:
