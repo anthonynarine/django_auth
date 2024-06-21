@@ -572,9 +572,26 @@ class Toggle2FAAPIView(APIView):
 class Verify2FASetupAPIView(APIView):
     """
     Verifies the OTP provided by the user during the initial 2FA setup process.
+    
+    This view handles the verification of the one-time password (OTP) during the two-factor authentication (2FA) setup process.
+    If the OTP is correct, it finalizes the 2FA setup by enabling 2FA for the user and generates new access, refresh, and CSRF tokens.
+    If the OTP is incorrect or the 2FA setup was not initialized properly, it returns an error message.
+    
+    Methods:
+        post(request, *args, **kwargs): Verifies the OTP and completes the 2FA setup process if the OTP is correct.
     """
     @method_decorator(login_required)
     def post(self, request, *args, **kwargs):
+        """
+        Handles the POST request to verify the OTP during the 2FA setup process.
+        
+        Parameters:
+            request (HttpRequest): The HTTP request object containing the OTP in the request data.
+            
+        Returns:
+            Response: A Django REST framework response object with either the success message and new tokens
+                    if the OTP is correct, or an error message if the OTP is incorrect or the setup was not initialized. 
+        """
         # Retrieve the current user
         user = request.user
         
@@ -592,7 +609,8 @@ class Verify2FASetupAPIView(APIView):
             with transaction.atomic():
                 if totp.verify(otp_provided):
                     user.is_2fa_enabled = True
-                    user.save(update_fields=["is_2fa_enabled"])
+                    user.is_2fa_setup_in_progress = False
+                    user.save(update_fields=["is_2fa_enabled", "is_2fa_setup_in_progress"])
                     
                     # Invalidate old refresh token
                     old_refresh_token = request.COOKIES.get("refresh_token")
@@ -600,7 +618,6 @@ class Verify2FASetupAPIView(APIView):
                         UserToken.objects.filter(user=user, token=old_refresh_token).delete()
                     
                     # Create new access and refresh tokens
-                    # access_token is not sent via Httponly cookie for front end demo using js.cookie
                     new_access_token = create_access_token(user.id)
                     new_refresh_token = create_refresh_token(user.id)
                     UserToken.objects.create(
@@ -609,18 +626,17 @@ class Verify2FASetupAPIView(APIView):
                         expired_at=timezone.now() + timedelta(days=7) 
                     )
                     
-                    # Preapte and send the response with the new tokens
+                    # Prepare and send the response with the new tokens
                     response = Response({
                         "message": "2FA setup complete, new tokens issued",
                         "access_token": new_access_token,
                         "refresh_token": new_refresh_token
                     }, status=status.HTTP_200_OK)
                     
-                    # Set CSRF token (this is good security practice see below for notes on get_token())
+                    # Set CSRF token (this is good security practice)
                     csrf_token = get_token(request)
                     response.set_cookie("csrftoken", csrf_token, httponly=False, secure=True, samesite="Strict")                              
                                         
-                    
                     logger.info(f"2FA setup completed successfully for user: {user.username}")
                     return response
                 else:
@@ -629,6 +645,7 @@ class Verify2FASetupAPIView(APIView):
         except Exception as e:
             logger.error(f"Error during 2FA verification for user: {user.username}. Exception: {str(e)}")
             return Response({"error": {"unexpected": "An unexpected error occurred. Please try again later."}}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 
         """
