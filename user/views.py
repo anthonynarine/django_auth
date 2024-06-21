@@ -519,20 +519,25 @@ class ResetPasswordRequestView(APIView):
 
 class Toggle2FAAPIView(APIView):
     """
-    Handles the PATCH request to toggle the "is_2fa_enabled" field of the user
-    
+    Handles the PATCH request to toggle the "is_2fa_enabled" field of the user.
+
+    This view is responsible for initiating or disabling the two-factor authentication (2FA) setup process.
+    When 2FA is enabled, it sets the "is_2fa_setup_in_progress" field to True to indicate that the setup process
+    is ongoing. When 2FA is disabled, it resets the "is_2fa_enabled", "is_2fa_setup_in_progress", and "tfa_secret"
+    fields to ensure that 2FA is fully disabled.
+
     Expects:
-        request.data: Dictionary containing "is_2fa_enabled" key with the boolean value
-        
+        request.data: Dictionary containing "is_2fa_enabled" key with a boolean value indicating whether 2FA should be enabled or disabled.
+
     Returns:
-        Response object with the new state of "is_2fa_enabled" or an error message
+        Response object with the new state of "is_2fa_enabled" and "is_2fa_setup_in_progress", or an error message.
     """
     def patch(self, request):
         logger.debug("Toggle2FAAPIView: Received request")
-        # Check if the user is authenticated + middleware already does this but I'll still keep this
         user = request.user
         logger.debug(f"Request user: {user}")
         
+        # check ensures that only authenticated users can toggle the 2FA status.
         if not user.is_authenticated:
             logger.error("Authentication failed: User is not authenticated")
             return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
@@ -542,12 +547,27 @@ class Toggle2FAAPIView(APIView):
             logger.error("Missing 'is_2fa_enabled' parameter in request")
             return Response({"error": "Missing 'is_2fa_enabled' parameter. Please specify if two-factor authentication should be enabled or disabled."}, status=status.HTTP_400_BAD_REQUEST)
         
-        user.is_2fa_enabled = is_2fa_enabled  
-        user.save(update_fields=["is_2fa_enabled"])
+        # when is_2fa_enabled is True
+        if is_2fa_enabled:
+            # Start the 2FA setup process
+            user.is_2fa_setup_in_progress = True
+            logger.info(f"2FA setup initiated for user {user.username}")
+        else:
+            # Disable 2FA and reset related fields if is_2fa_enabeled is False
+            user.is_2fa_enabled = False
+            user.is_2fa_setup_in_progress = False
+            user.tfa_secret = ""
+            logger.info(f"2FA disabled for user {user.username}")
         
-        logger.info(f"2FA status toggled successfully for user {user.username}. New value: {is_2fa_enabled}")
+        # Save the updated fields to the database
+        user.save(update_fields=["is_2fa_enabled", "is_2fa_setup_in_progress", "tfa_secret"])
         
-        return Response({"is_2fa_enabled": user.is_2fa_enabled}, status=status.HTTP_200_OK)
+        logger.info(f"2FA status toggled successfully for user {user.username}. is_2fa_enabled set to {is_2fa_enabled}, is_2fa_setup_in_progress set to {user.is_2fa_setup_in_progress}.")
+        
+        return Response({
+            "is_2fa_setup_in_progress": user.is_2fa_setup_in_progress
+        }, status=status.HTTP_200_OK)
+
     
 class Verify2FASetupAPIView(APIView):
     """
