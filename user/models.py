@@ -50,6 +50,11 @@ class CustomUser(AbstractUser):
         verbose_name='Is 2FA Enabled',
         help_text='Check this if you wish to enable two-factor authentication.'
     )
+    is_2fa_setup_in_progress = models.BooleanField(
+        default=False,
+        verbose_name="Is 2FA Setup in Progress",
+        help_text="Tracks whether the 2Fa setup process is ongoing"
+    )
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []
