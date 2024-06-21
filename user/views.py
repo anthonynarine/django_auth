@@ -173,6 +173,11 @@ class LoginAPIView(APIView):
         it checks whether 2FA is enabled for the user. If 2FA is enabled, it issues a temporary
         token and sets it in an HTTP-only cookie. Otherwise, it issues access and refresh tokens.
 
+        Expects:
+            request.data: Dictionary containing:
+                - email (str): The user's email address.
+                - password (str): The user's password.
+
         Parameters:
             request (HttpRequest): The request object containing the email and password.
 
@@ -200,13 +205,21 @@ class LoginAPIView(APIView):
         # Log the user in, which establishes the user's session.
         login(request, user)
 
+        # Check if the 2FA setup was incomplete and reset if necessary
+        if user.is_2fa_setup_in_progress:
+            user.is_2fa_enabled = False
+            user.is_2fa_setup_in_progress = False
+            user.tfa_secret = ''
+            user.save(update_fields=["is_2fa_enabled", "is_2fa_setup_in_progress", "tfa_secret"])
+            logger.info(f"2FA setup reset for user {user.username} due to incomplete setup.")
+
         # Check if 2FA is enabled for the user
         if user.is_2fa_enabled:
             try:
                 # Create a temporary token specifically for 2FA verification
                 temp_token = create_temporary_2fa_token(user.id)
                 response = Response({'message': '2FA required', '2fa_required': True}, status=status.HTTP_401_UNAUTHORIZED)
-                response.set_cookie("temp_token", temp_token, max_age=600, httponly=True, secure=True, samesite="None") # Token expires in 10 minutes
+                response.set_cookie("temp_token", temp_token, max_age=600, httponly=True, secure=True, samesite="None")  # Token expires in 10 minutes
                 logger.info(f"2FA required for user {email}. Temporary token issued.")
                 return response
             except Exception as e:
@@ -568,7 +581,6 @@ class Toggle2FAAPIView(APIView):
             "is_2fa_setup_in_progress": user.is_2fa_setup_in_progress
         }, status=status.HTTP_200_OK)
 
-    
 class Verify2FASetupAPIView(APIView):
     """
     Verifies the OTP provided by the user during the initial 2FA setup process.
@@ -600,8 +612,8 @@ class Verify2FASetupAPIView(APIView):
 
         # Check if the 2FA secret key is set for the user. This key is necessary to verify the OTP.
         # If it's not set, it means the 2FA setup was not initialized properly, and the verification cannot proceed.
-        if not user.tfa_secret:
-            logger.error(f"Attempt to verify OTP without 2FA setup by user: {user.username}")
+        if not user.tfa_secret or not user.is_2fa_setup_in_progress:
+            logger.error(f"Attempt to verify OTP without proper 2FA setup by user: {user.username}")
             return Response({"error": {"tfa_setup": "2FA is not set up."}}, status=status.HTTP_400_BAD_REQUEST)
         
         totp = pyotp.TOTP(user.tfa_secret)
