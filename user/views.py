@@ -115,6 +115,7 @@ class RegisterAPIView(APIView):
             return Response({"error": {"password": str(e)}}, status=status.HTTP_400_BAD_REQUEST)
 
         # Initialize the serializer with the modified data
+        logger.debug("RegisterAPIView: Received request with data: %s", request.data)
         serializer = CustomUserSerializer(data=data)
         try:
             serializer.is_valid(raise_exception=True)
