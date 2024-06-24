@@ -45,7 +45,7 @@ from authentication.settings import ACCESS_TOKEN_SAMESITE, REFRESH_TOKEN_SAMESIT
 
 # Local application/library specific imports
 from .auth_token import JWT_ACCESS_SECRET, create_access_token, create_refresh_token, decode_refresh_token, JWTAuthentication, create_temporary_2fa_token, decode_temporary_token
-from .models import CustomUser, TemporarySecurityToken, UserToken, Reset
+from .models import CustomUser, UserToken, Reset
 from .serializers import CustomUserSerializer
 from django.http import HttpResponse
 from django.conf import settings
@@ -384,12 +384,20 @@ class ValidateSessionAPIView(APIView):
 class RefreshAPIView(APIView):
     
     def post(self, request):
-        refresh_token = request.COOKIES.get("refresh_token")
-        user_id = decode_refresh_token(refresh_token)
+        # Extract the refresh token from the Authorization header
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer"):
+            refresh_token = auth_header.split(' ')[1]
+        else:
+            refresh_token = None
         
         # Log the received refresh token and user_id
         logger.debug(f"Received refresh token: {refresh_token}")  
-        logger.debug(f"Decoded user ID: {user_id}") 
+        
+        if not refresh_token:
+            raise exceptions.AuthenticationFailed("Refresh token not found in headers")
+        
+        user_id = decode_refresh_token(refresh_token)
         
         if not UserToken.objects.filter(
             user=user_id,

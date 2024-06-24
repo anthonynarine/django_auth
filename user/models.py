@@ -66,7 +66,15 @@ class CustomUser(AbstractUser):
 
 class UserToken(models.Model):
     """
-    Token model for storing refresh tokens for users.
+    Model for storing refresh tokens for users.
+    
+    Attributes:
+        user (ForeignKey): Reference to the user who owns this token.
+        token (CharField): The actual token string, which must be unique.
+        created_at (DateTimeField): The date and time when this token was created.
+        expired_at (DateTimeField): The date and time when this token will expire.
+        is_revoked (BooleanField): Indicates whether this token has been revoked.
+        last_used_at (DateTimeField): The last date and time this token was used
     """
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
