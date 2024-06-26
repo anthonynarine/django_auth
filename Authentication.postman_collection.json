@@ -3,494 +3,400 @@
 		"_postman_id": "471b5b31-c00b-437d-a8a4-4d20a0dfc3cb",
 		"name": "User Authentication and Account Management",
 		"description": "This 'User Authentication and Account Management' collection encompasses all endpoints related to managing user authentication and account operations. It covers user registration, login processes, token refresh, user data access with a token, and account recovery options like password reset.\n\n## Using the `base_url` Environment Variable\n\nIn this collection, `base_url` is `ant-django-auth-62cf01255868.herokuapp.com`. To set this up in Postman, follow these steps:\n\n1. **Define Environment Variables**:\n   - Go to the 'Environments' tab in Postman.\n   - Create a new environment or select an existing one.\n   - Add a variable named `base_url`.\n   - Set its value to `ant-django-auth-62cf01255868.herokuapp.com`.\n\n2. **Select the Environment**:\n   - Ensure the correct environment is selected from the environment dropdown in Postman before sending requests.\n\n3. **Using Variables in Requests**:\n   - The requests in this collection use the `base_url` variable like this: `https://{{base_url}}/api/register/`. Postman will automatically replace `{{base_url}}` with the value defined in your environment.\n\nBy using the `base_url` environment variable, you can easily switch between different environments without modifying each request manually.",
-		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json",
 		"_exporter_id": "23868442"
 	},
 	"item": [
 		{
-			"name": "Register user",
-			"request": {
-				"method": "POST",
-				"header": [],
-				"body": {
-					"mode": "raw",
-					"raw": "{\n    \"first_name\": \"Naruto\",\n    \"last_name\": \"Uzimaki\",\n    \"email\": \"Naruto@konoha.com\",\n    \"password\": \"HiddenLeaf9\",\n    \"password_confirm\": \"HiddenLeaf9\"\n}",
-					"options": {
-						"raw": {
-							"language": "json"
-						}
-					}
-				},
-				"url": {
-					"raw": "http://{{base_url}}/api/register/",
-					"protocol": "http",
-					"host": [
-						"{{base_url}}"
-					],
-					"path": [
-						"api",
-						"register",
-						""
-					]
-				},
-				"description": "Allows new users to create an account. Requires first name, last name, email, password, and password confirmation."
-			},
-			"response": [
+			"name": "User Management",
+			"item": [
 				{
-					"name": "Successful Registration",
-					"originalRequest": {
+					"name": "Register user",
+					"request": {
 						"method": "POST",
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"first_name\": \"Naruto\",\n    \"last_name\": \"Uzimaki\",\n    \"email\": \"Naruto.@konoha.com\",\n    \"password\": \"HiddenLeaf9\",\n    \"password_confirm\": \"HiddenLeaf9\"\n}"
+							"raw": "{\n    \"first_name\": \"Naruto\",\n    \"last_name\": \"Uzimaki\",\n    \"email\": \"Naruto@konoha.com\",\n    \"password\": \"HiddenLeaf9\",\n    \"password_confirm\": \"HiddenLeaf9\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
 						},
-						"url": {
-							"raw": "https://ant-django-auth-62cf01255868.herokuapp.com/api/register",
-							"protocol": "https",
-							"host": [
-								"ant-django-auth-62cf01255868",
-								"herokuapp",
-								"com"
-							],
-							"path": [
-								"api",
-								"register"
-							]
-						}
+						"url": "https://{{base_url}}/api/register/",
+						"description": "Allows new users to create an account. Requires first name, last name, email, password, and password confirmation."
 					},
-					"status": "Created",
-					"code": 201,
-					"_postman_previewlanguage": "Text",
-					"header": [],
-					"cookie": [],
-					"body": "{\n    \"message\": \"User registered successfully. Please log in.\"\n}"
-				}
-			]
-		},
-		{
-			"name": "Login",
-			"request": {
-				"method": "POST",
-				"header": [],
-				"body": {
-					"mode": "raw",
-					"raw": "{\n    \"email\": \"naruto@konoha.com\",\n    \"password\": \"HiddenLeaf9\"\n}",
-					"options": {
-						"raw": {
-							"language": "json"
+					"response": [
+						{
+							"name": "Successful Registration",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"first_name\": \"Naruto\",\n    \"last_name\": \"Uzimaki\",\n    \"email\": \"Naruto@konoha.com\",\n    \"password\": \"HiddenLeaf9\",\n    \"password_confirm\": \"HiddenLeaf9\"\n}"
+								},
+								"url": "https://{{base_url}}/api/register"
+							},
+							"status": "Created",
+							"code": 201,
+							"_postman_previewlanguage": "Text",
+							"header": [],
+							"cookie": [],
+							"body": "{\n    \"message\": \"User registered successfully. Please log in.\"\n}"
 						}
-					}
-				},
-				"url": {
-					"raw": "https://{{base_url}}/api/login/",
-					"protocol": "https",
-					"host": [
-						"{{base_url}}"
 					],
-					"path": [
-						"api",
-						"login",
-						""
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test(\"Response contains success message\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.message).to.eql(\"User registered successfully. Please log in.\");",
+									"});"
+								]
+							}
+						}
 					]
 				},
-				"description": "Authenticates the user and returns authentication tokens (access and refresh tokens)."
-			},
-			"response": [
 				{
-					"name": "Successful Login",
-					"originalRequest": {
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"email\": \"john.doe@example.com\",\n    \"password\": \"password123\"\n}"
-						},
-						"url": {
-							"raw": "https://ant-django-auth-62cf01255868.herokuapp.com/api/login",
-							"protocol": "https",
-							"host": [
-								"ant-django-auth-62cf01255868",
-								"herokuapp",
-								"com"
-							],
-							"path": [
-								"api",
-								"login"
-							]
-						}
-					},
-					"status": "OK",
-					"code": 200,
-					"_postman_previewlanguage": "Text",
-					"header": [],
-					"cookie": [],
-					"body": "{\n    \"access_token\": \"example-access-token\",\n    \"refresh_token\": \"example-refresh-token\"\n}"
-				}
-			]
-		},
-		{
-			"name": "Fetch User",
-			"request": {
-				"method": "GET",
-				"header": [
-					{
-						"key": "Authorization",
-						"value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxMCwiZXhwIjoxNzE3MTIxMTAxLCJpYXQiOjE3MTcxMTk5MDF9._C6EP_KkTrObKqM5ZhzlN1iocb3lPT1MdiPZYLw-bE8"
-					}
-				],
-				"url": {
-					"raw": "https://{{base_url}}/api/validate-session/",
-					"protocol": "https",
-					"host": [
-						"{{base_url}}"
-					],
-					"path": [
-						"api",
-						"validate-session",
-						""
-					]
-				},
-				"description": "Retrieves the authenticated user's profile information. Requires a valid access token."
-			},
-			"response": [
-				{
-					"name": "User Data",
-					"originalRequest": {
+					"name": "Fetch User",
+					"request": {
 						"method": "GET",
 						"header": [
 							{
 								"key": "Authorization",
-								"value": "Bearer {{access_token}}",
-								"type": "text"
+								"value": "Bearer {{access_token}}"
 							}
 						],
-						"url": {
-							"raw": "https://ant-django-auth-62cf01255868.herokuapp.com/api/validate-session",
-							"protocol": "https",
-							"host": [
-								"ant-django-auth-62cf01255868",
-								"herokuapp",
-								"com"
-							],
-							"path": [
-								"api",
-								"validate-session"
-							]
-						}
+						"url": "https://{{base_url}}/api/validate-session/",
+						"description": "Retrieves the authenticated user's profile information. Requires a valid access token."
 					},
-					"status": "OK",
-					"code": 200,
-					"_postman_previewlanguage": "Text",
-					"header": [],
-					"cookie": [],
-					"body": "{\n    \"email\": \"john.doe@example.com\",\n    \"first_name\": \"John\",\n    \"last_name\": \"Doe\"\n}"
+					"response": [
+						{
+							"name": "User Data",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{access_token}}",
+										"type": "text"
+									}
+								],
+								"url": "https://{{base_url}}/api/validate-session"
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "Text",
+							"header": [],
+							"cookie": [],
+							"body": "{\n    \"email\": \"john.doe@example.com\",\n    \"first_name\": \"John\",\n    \"last_name\": \"Doe\"\n}"
+						}
+					],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response contains user data\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('email');",
+									"    pm.expect(jsonData).to.have.property('first_name');",
+									"    pm.expect(jsonData).to.have.property('last_name');",
+									"});"
+								]
+							}
+						}
+					]
 				}
 			]
 		},
 		{
-			"name": "Obtain Refresh Token",
-			"request": {
-				"method": "POST",
-				"header": [],
-				"url": {
-					"raw": "https://{{base_url}}/api/token-refresh",
-					"protocol": "https",
-					"host": [
-						"{{base_url}}"
-					],
-					"path": [
-						"api",
-						"token-refresh"
-					]
-				},
-				"description": "Allows refreshing of the access token using a refresh token."
-			},
-			"response": [
+			"name": "Authentication",
+			"item": [
 				{
-					"name": "Token Refreshed",
-					"originalRequest": {
+					"name": "Login",
+					"request": {
 						"method": "POST",
 						"header": [],
-						"url": {
-							"raw": "https://ant-django-auth-62cf01255868.herokuapp.com/api/token-refresh",
-							"protocol": "https",
-							"host": [
-								"ant-django-auth-62cf01255868",
-								"herokuapp",
-								"com"
-							],
-							"path": [
-								"api",
-								"token-refresh"
-							]
-						}
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"naruto@konoha.com\",\n    \"password\": \"HiddenLeaf9\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "https://{{base_url}}/api/login/",
+						"description": "Authenticates the user and returns authentication tokens (access and refresh tokens)."
 					},
-					"status": "OK",
-					"code": 200,
-					"_postman_previewlanguage": "Text",
-					"header": [],
-					"cookie": [],
-					"body": "{\n    \"access_token\": \"new-example-access-token\"\n}"
-				}
-			]
-		},
-		{
-			"name": "Logout",
-			"request": {
-				"method": "POST",
-				"header": [
-					{
-						"key": "Authorization",
-						"value": "",
-						"disabled": true
-					}
-				],
-				"url": {
-					"raw": "https://{{base_url}}/api/logout/",
-					"protocol": "https",
-					"host": [
-						"{{base_url}}"
+					"response": [
+						{
+							"name": "Successful Login",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"email\": \"john.doe@example.com\",\n    \"password\": \"password123\"\n}"
+								},
+								"url": "https://{{base_url}}/api/login"
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "Text",
+							"header": [],
+							"cookie": [],
+							"body": "{\n    \"access_token\": \"example-access-token\",\n    \"refresh_token\": \"example-refresh-token\"\n}"
+						}
 					],
-					"path": [
-						"api",
-						"logout",
-						""
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response contains tokens\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('access_token');",
+									"    pm.expect(jsonData).to.have.property('refresh_token');",
+									"});"
+								]
+							}
+						}
 					]
 				},
-				"description": "Logs out the user from the application by invalidating their current access token."
-			},
-			"response": [
 				{
-					"name": "Successful Logout",
-					"originalRequest": {
+					"name": "Logout",
+					"request": {
 						"method": "POST",
 						"header": [
 							{
 								"key": "Authorization",
-								"value": "Bearer {{access_token}}",
-								"type": "text"
+								"value": "",
+								"disabled": true
 							}
 						],
-						"url": {
-							"raw": "https://ant-django-auth-62cf01255868.herokuapp.com/api/logout",
-							"protocol": "https",
-							"host": [
-								"ant-django-auth-62cf01255868",
-								"herokuapp",
-								"com"
-							],
-							"path": [
-								"api",
-								"logout"
-							]
-						}
+						"url": "https://{{base_url}}/api/logout/",
+						"description": "Logs out the user from the application by invalidating their current access token."
 					},
-					"status": "OK",
-					"code": 200,
-					"_postman_previewlanguage": "Text",
-					"header": [],
-					"cookie": [],
-					"body": "{\n    \"message\": \"User logged out successfully.\"\n}"
+					"response": [
+						{
+							"name": "Successful Logout",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{access_token}}",
+										"type": "text"
+									}
+									],
+								"url": "https://{{base_url}}/api/logout"
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "Text",
+							"header": [],
+							"cookie": [],
+							"body": "{\n    \"message\": \"User logged out successfully.\"\n}"
+						}
+					],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response contains success message\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.message).to.eql(\"User logged out successfully.\");",
+									"});"
+								]
+							}
+						}
+					]
 				}
 			]
 		},
 		{
-			"name": "Forgot Password",
-			"request": {
-				"method": "POST",
-				"header": [],
-				"body": {
-					"mode": "raw",
-					"raw": "{\n    \"email\": \"john.doe@example.com\"\n}",
-					"options": {
-						"raw": {
-							"language": "json"
-						}
-					}
-				},
-				"url": {
-					"raw": "https://{{base_url}}/api/forgot-password",
-					"protocol": "https",
-					"host": [
-						"{{base_url}}"
-					],
-					"path": [
-						"api",
-						"forgot-password"
-					]
-				},
-				"description": "Initiates the password reset process for users who have forgotten their password."
-			},
-			"response": [
+			"name": "Account Recovery",
+			"item": [
 				{
-					"name": "Password Reset Email Sent",
-					"originalRequest": {
+					"name": "Forgot Password",
+					"request": {
 						"method": "POST",
 						"header": [],
-						"url": {
-							"raw": "https://ant-django-auth-62cf01255868.herokuapp.com/api/forgot-password",
-							"protocol": "https",
-							"host": [
-								"ant-django-auth-62cf01255868",
-								"herokuapp",
-								"com"
-							],
-							"path": [
-								"api",
-								"forgot-password"
-							]
-						}
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"john.doe@example.com\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "https://{{base_url}}/api/forgot-password",
+						"description": "Initiates the password reset process for users who have forgotten their password."
 					},
-					"status": "OK",
-					"code": 200,
-					"_postman_previewlanguage": "Text",
-					"header": [],
-					"cookie": [],
-					"body": "{\n    \"message\": \"Password reset email sent. Check your inbox.\"\n}"
-				}
-			]
-		},
-		{
-			"name": "Reset Password",
-			"request": {
-				"method": "POST",
-				"header": [],
-				"body": {
-					"mode": "raw",
-					"raw": "{\n    \"token\": \"validTokenExample\",\n    \"password\": \"newStrongPassword123\",\n    \"password_confirm\": \"newStrongPassword123\"\n}",
-					"options": {
-						"raw": {
-							"language": "json"
+					"response": [
+						{
+							"name": "Password Reset Email Sent",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"url": "https://{{base_url}}/api/forgot-password"
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "Text",
+							"header": [],
+							"cookie": [],
+							"body": "{\n    \"message\": \"Password reset email sent. Check your inbox.\"\n}"
 						}
-					}
-				},
-				"url": {
-					"raw": "https://{{base_url}}/api/reset-password",
-					"protocol": "https",
-					"host": [
-						"{{base_url}}"
 					],
-					"path": [
-						"api",
-						"reset-password"
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response contains success message\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.message).to.eql(\"Password reset email sent. Check your inbox.\");",
+									"});"
+								]
+							}
+						}
 					]
 				},
-				"description": "Allows users to reset their password using a token received via email. The request must include the token, the new password, and a confirmation of the new password."
-			},
-			"response": [
 				{
-					"name": "Password Reset Successful",
-					"originalRequest": {
+					"name": "Reset Password",
+					"request": {
 						"method": "POST",
 						"header": [],
-						"url": {
-							"raw": "https://ant-django-auth-62cf01255868.herokuapp.com/api/reset-password",
-							"protocol": "https",
-							"host": [
-								"ant-django-auth-62cf01255868",
-								"herokuapp",
-								"com"
-							],
-							"path": [
-								"api",
-								"reset-password"
-							]
-						}
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"token\": \"validTokenExample\",\n    \"password\": \"newStrongPassword123\",\n    \"password_confirm\": \"newStrongPassword123\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "https://{{base_url}}/api/reset-password",
+						"description": "Allows users to reset their password using a token received via email. The request must include the token, the new password, and a confirmation of the new password."
 					},
-					"status": "OK",
-					"code": 200,
-					"_postman_previewlanguage": "Text",
-					"header": [],
-					"cookie": [],
-					"body": "{\n    \"message\": \"Password has been reset successfully.\"\n}"
+					"response": [
+						{
+							"name": "Password Reset Successful",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"url": "https://{{base_url}}/api/reset-password"
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "Text",
+							"header": [],
+							"cookie": [],
+							"body": "{\n    \"message\": \"Password has been reset successfully.\"\n}"
+						}
+					],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response contains success message\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.message).to.eql(\"Password has been reset successfully.\");",
+									"});"
+								]
+							}
+						}
+					]
 				}
 			]
 		},
 		{
-			"name": "TEST_CSRF_EXEMPT",
-			"request": {
-				"method": "POST",
-				"header": [],
-				"url": {
-					"raw": "https://{{base_url}}/api/test-csrf-exempt/",
-					"protocol": "https",
-					"host": [
-						"{{base_url}}"
-					],
-					"path": [
-						"api",
-						"test-csrf-exempt",
-						""
-					]
-				}
-			},
-			"response": [
+			"name": "Tokens",
+			"item": [
 				{
-					"name": "CSRF Exempt View Works",
-					"originalRequest": {
+					"name": "Obtain New Access Token",
+					"request": {
 						"method": "POST",
 						"header": [],
-						"url": {
-							"raw": "https://ant-django-auth-62cf01255868.herokuapp.com/api/test-csrf-exempt",
-							"protocol": "https",
-							"host": [
-								"ant-django-auth-62cf01255868",
-								"herokuapp",
-								"com"
-							],
-							"path": [
-								"api",
-								"test-csrf-exempt"
-							]
-						}
+						"url": "https://{{base_url}}/api/token-refresh",
+						"description": "Allows refreshing of the access token using a refresh token."
 					},
-					"status": "OK",
-					"code": 200,
-					"_postman_previewlanguage": "Text",
-					"header": [],
-					"cookie": [],
-					"body": "{\n    \"message\": \"CSRF exempt view works\"\n}"
+					"response": [
+						{
+							"name": "Token Refreshed",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"url": "https://{{base_url}}/api/token-refresh"
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "Text",
+							"header": [],
+							"cookie": [],
+							"body": "{\n    \"access_token\": \"new-example-access-token\"\n}"
+						}
+					],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response contains new access token\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('access_token');",
+									"});"
+								]
+							}
+						}
+					]
 				}
 			]
 		},
 		{
-			"name": "Toggle_2FA",
-			"request": {
-				"method": "PATCH",
-				"header": [
-					{
-						"key": "Authorization",
-						"value": "Bearer {{access_token}}"
-					}
-				],
-				"body": {
-					"mode": "raw",
-					"raw": "{\n  \"is_2fa_enabled\": false\n}",
-					"options": {
-						"raw": {
-							"language": "json"
-						}
-					}
-				},
-				"url": {
-					"raw": "https://{{base_url}}/api/user/toggle-2fa",
-					"protocol": "https",
-					"host": [
-						"{{base_url}}"
-					],
-					"path": [
-						"api",
-						"user",
-						"toggle-2fa"
-					]
-				},
-				"description": "Toggles the two-factor authentication setting for the user."
-			},
-			"response": [
+			"name": "Two Factor Authentication",
+			"item": [
 				{
-					"name": "2FA Toggled Successfully",
-					"originalRequest": {
+					"name": "Toggle 2FA",
+					"request": {
 						"method": "PATCH",
 						"header": [
 							{
@@ -498,27 +404,56 @@
 								"value": "Bearer {{access_token}}"
 							}
 						],
-						"url": {
-							"raw": "https://ant-django-auth-62cf01255868.herokuapp.com/api/user/toggle-2fa",
-							"protocol": "https",
-							"host": [
-								"ant-django-auth-62cf01255868",
-								"herokuapp",
-								"com"
-							],
-							"path": [
-								"api",
-								"user",
-								"toggle-2fa"
-							]
-						}
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"is_2fa_enabled\": false\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "https://{{base_url}}/api/user/toggle-2fa",
+						"description": "Toggles the two-factor authentication setting for the user."
 					},
-					"status": "OK",
-					"code": 200,
-					"_postman_previewlanguage": "Text",
-					"header": [],
-					"cookie": [],
-					"body": "{\n    \"is_2fa_enabled\": false\n}"
+					"response": [
+						{
+							"name": "2FA Toggled Successfully",
+							"originalRequest": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{access_token}}"
+									}
+								],
+								"url": "https://{{base_url}}/api/user/toggle-2fa"
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "Text",
+							"header": [],
+							"cookie": [],
+							"body": "{\n    \"is_2fa_enabled\": false\n}"
+						}
+					],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response contains updated 2FA status\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('is_2fa_enabled');",
+									"});"
+								]
+							}
+						}
+					]
 				}
 			]
 		}
@@ -528,9 +463,8 @@
 			"listen": "prerequest",
 			"script": {
 				"type": "text/javascript",
-				"packages": {},
 				"exec": [
-					""
+					"pm.environment.set(\"base_url\", \"https://ant-django-auth-62cf01255868.herokuapp.com\");"
 				]
 			}
 		},
@@ -538,7 +472,6 @@
 			"listen": "test",
 			"script": {
 				"type": "text/javascript",
-				"packages": {},
 				"exec": [
 					""
 				]
