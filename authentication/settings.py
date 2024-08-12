@@ -23,7 +23,9 @@ ALLOWED_HOSTS = [
     "localhost:3000"]
 
 # Decide which React app base URL to use based on DEBUG
-REACT_APP_BASE_URL = config('REACT_APP_BASE_URL_DEV') if DEBUG else config('REACT_APP_BASE_URL_PROD')
+REACT_APP_BASE_URL = config(
+    'REACT_APP_BASE_URL_DEV') if DEBUG else config('REACT_APP_BASE_URL_PROD'
+)
 
 
 # Application definition
