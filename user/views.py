@@ -55,11 +55,11 @@ print(User)
 
 logger = logging.getLogger(__name__)
 # Test logging
-# logger.debug("This is a debug message")
-# logger.info("This is an info message")
-# logger.warning("This is a warning message")
-# logger.error("This is an error message")
-# logger.critical("This is a critical message")
+logger.debug("This is a debug message")
+logger.info("This is an info message")
+logger.warning("This is a warning message")
+logger.error("This is an error message")
+logger.critical("This is a critical message")
 
 # ANSI color codes for logger
 RED = '\033[91m'
@@ -167,6 +167,9 @@ class LoginAPIView(APIView):
     permission_classes = [AllowAny]  # Allow access to any user regardless of their authentication status.
 
     def post(self, request):
+        print("LoginAPIView: Request reached")
+
+        logger.info("LoginAPIView: Received request with data: %s", request.data)
         """
         Handle POST request to authenticate a user.
 
@@ -473,6 +476,7 @@ class ForgotPasswordRequestView(APIView):
         react_app_base_url = settings.REACT_APP_BASE_URL
         uid_encoded = urlsafe_base64_encode(force_bytes(user.pk))
         reset_link = f"{react_app_base_url}/reset-password/{uid_encoded}/{token}"
+        logger.debug(f"ForgotPasswordRequestView: Generated reset link: {reset_link}")
 
         # Prepare HTML and plain text versions of the password reset email.
         html_content = render_to_string("email/password_reset_email.html", {"reset_link": reset_link})
@@ -505,10 +509,11 @@ class ResetPasswordRequestView(APIView):
         password = data.get("password")
         password_confirm = data.get("password_confirm")
         token = data.get("token")
+        logger.debug(f"Request data: {data}")
   
         
         # VAlidate required fields
-        if not all([password, password_confirm, token,]):
+        if not all([password, password_confirm, token]):
             return Response({
                 "error": "Password, Password confirmation, and token are required"
             }, status=status.HTTP_400_BAD_REQUEST)
@@ -526,6 +531,7 @@ class ResetPasswordRequestView(APIView):
         
         # Retrieve the reset record using the token
         with transaction.atomic():
+            logger.info("ResetPasswordRequestView: Attempting to retrieve reset record.")
             reset_password = get_object_or_404(Reset, token=token)
             user = get_object_or_404(User, email=reset_password.email) 
 
