@@ -505,9 +505,10 @@ class ResetPasswordRequestView(APIView):
         password = data.get("password")
         password_confirm = data.get("password_confirm")
         token = data.get("token")
+  
         
         # VAlidate required fields
-        if not all([password, password_confirm, token]):
+        if not all([password, password_confirm, token,]):
             return Response({
                 "error": "Password, Password confirmation, and token are required"
             }, status=status.HTTP_400_BAD_REQUEST)
