@@ -7,12 +7,17 @@ connection = pika.BlockingConnection(pika.ConnectionParameters("localhost"))
 # Create a channel
 channel = connection.channel()
 
-# Create a queue
+# Create a queue on the above channel
 channel.queue_declare(queue="hello")
 
-# Send message to queue
-channel.basic_publish(exchange="", routing_key="hello", body="hello world")
+message = "Testing receiver"
+
+# Send message to queue throught the channel
+channel.basic_publish(exchange="", routing_key="hello", body=message)
 print(" [X] sent 'hello world'")
+
+# close the channel when done
+channel.close()
 
 # Close connection
 connection.close()
