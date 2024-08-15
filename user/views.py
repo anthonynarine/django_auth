@@ -47,6 +47,7 @@ from authentication.settings import ACCESS_TOKEN_SAMESITE, REFRESH_TOKEN_SAMESIT
 from .auth_token import JWT_ACCESS_SECRET, create_access_token, create_refresh_token, decode_refresh_token, JWTAuthentication, create_temporary_2fa_token, decode_temporary_token
 from .models import CustomUser, UserToken, Reset
 from .serializers import CustomUserSerializer
+from .producer import send_user_registered_message
 from django.http import HttpResponse
 from django.conf import settings
 
@@ -120,6 +121,18 @@ class RegisterAPIView(APIView):
         try:
             serializer.is_valid(raise_exception=True)
             user = serializer.save()
+            
+            # Prepare the user data to send to RabbitMQ
+            user_data = {
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "is_2fa_enabled": user.is_2fa_enabled,
+            }
+            
+            # Send the registration event to RabbitMQ
+            send_user_registered_message(user_data)
+                        
             # Send the thank you email
             self.send_thank_you_email(user.email)
             return Response(serializer.data, status=status.HTTP_201_CREATED)

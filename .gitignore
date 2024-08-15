@@ -5,7 +5,7 @@ __pycache__/
 
 # C extensions
 *.so
- 
+rabbitmq_connect_tutorial.py
 auth_venv
 
 # Distribution / packaging
