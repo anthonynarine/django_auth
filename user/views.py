@@ -47,7 +47,7 @@ from authentication.settings import ACCESS_TOKEN_SAMESITE, REFRESH_TOKEN_SAMESIT
 from .auth_token import JWT_ACCESS_SECRET, create_access_token, create_refresh_token, decode_refresh_token, JWTAuthentication, create_temporary_2fa_token, decode_temporary_token
 from .models import CustomUser, UserToken, Reset
 from .serializers import CustomUserSerializer
-from .producer import send_user_registered_message
+from .rabbitmq_producer import send_user_registered_message
 from django.http import HttpResponse
 from django.conf import settings
 
