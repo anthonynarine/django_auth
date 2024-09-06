@@ -124,6 +124,7 @@ class RegisterAPIView(APIView):
             
             # Prepare the user data to send to RabbitMQ
             user_data = {
+                "id": user.id,
                 "email": user.email,
                 "first_name": user.first_name,
                 "last_name": user.last_name,
