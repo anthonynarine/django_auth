@@ -41,7 +41,6 @@ def create_access_token(user_id):
     Returns:
         A JWT access token as a string, encoded with HS256 algorithm.
     """
-    logger.debug(f"Using JWT_ACCESS_SECRET: {JWT_ACCESS_SECRET}")  # Log the secret for debugging
     # Payload of the token with user_id, expiration time, and issued at time.
     payload = {
         "user_id": user_id,  # Unique identifier for the user
