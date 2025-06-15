@@ -9,9 +9,12 @@ from django.db import models
 from django.forms import DateTimeField
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
+from user.roles import RoleChoices
 
 # Local application/library specific imports
 from .manager import CustomUserManager
+
+
 
 class CustomUser(AbstractUser):
     """
@@ -54,6 +57,12 @@ class CustomUser(AbstractUser):
         default=False,
         verbose_name="Is 2FA Setup in Progress",
         help_text="Tracks whether the 2Fa setup process is ongoing"
+    )
+    role = models.CharField(
+        max_length=20,
+        choices=RoleChoices.choices,
+        default=RoleChoices.TECHNOLOGIST,
+        help_text="User's role in the system (admin, physician, technologist)."
     )
 
     USERNAME_FIELD = "email"

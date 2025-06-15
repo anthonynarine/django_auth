@@ -41,9 +41,12 @@ def create_access_token(user_id):
     Returns:
         A JWT access token as a string, encoded with HS256 algorithm.
     """
+    user = User.objects.get(id=user_id) # Fetch full user to get role
     # Payload of the token with user_id, expiration time, and issued at time.
     payload = {
         "user_id": user_id,  # Unique identifier for the user
+        "email": user.email,
+        "role": user.role,  # ✅ Inject the user's role into access token
         "exp": datetime.now(timezone.utc) + timedelta(minutes=15),  # Token expiration time (20 mins from now)
         "iat": datetime.now(timezone.utc)  # Token issue time
     }
@@ -65,7 +68,6 @@ def decode_access_token(token):
         logger.error(f"{RED}Unexpected error decoding token: {str(e)}{END}")
         raise exceptions.AuthenticationFailed(f"Token cannot be decoded: {str(e)}")
 
-
 def create_refresh_token(user_id):
     """
     Generates a JWT refresh token for a given user ID.
@@ -80,10 +82,14 @@ def create_refresh_token(user_id):
     Returns:
         A JWT refresh token as a string, encoded with HS256 algorithm.
     """
+    user = User.objects.get(id=user_id)
+    
     # Payload of the token with user_id, expiration time (7 days from now), and issued at time.
     logger.debug(f"JWT_REFRESH_SECRET used for signing: {JWT_REFRESH_SECRET}")
     payload = {
         "user_id": user_id,  # Unique identifier for the user
+        "email": user.email,
+        "role": user.role,
         "exp": datetime.now(timezone.utc) + timedelta(days=7),  # Token expiration time (7 days from now)
         "iat": datetime.now(timezone.utc)  # Token issue time
     }

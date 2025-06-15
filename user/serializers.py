@@ -7,7 +7,15 @@ class CustomUserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CustomUser
-        fields = ["id", "first_name", "last_name", "email", "password", "is_2fa_enabled"]
+        fields = [
+            "id",
+            "first_name",
+            "last_name",
+            "email",
+            "password",
+            "is_2fa_enabled",
+            "role",
+        ]
         # pw will be inserted into db but retrieve mothod will not return the pw field
         extra_kwargs = {'password': {'write_only': True}} 
         

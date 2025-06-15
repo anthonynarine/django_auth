@@ -34,6 +34,9 @@ from django.middleware.csrf import get_token
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from django.views.decorators.csrf import csrf_exempt
 
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.permissions import IsAuthenticated
+
 import pyotp
 import qrcode
 
@@ -380,7 +383,7 @@ class ValidateSessionAPIView(APIView):
 
     def get(self, request):
         # Log the headers to see if the Authorization header is present
-        # logger.debug(f"Request headers: {request.headers}")
+        logger.debug(f"Request headers: {request.headers}")
         
         # Check if the request.user is an instance of AnonymousUser
         if isinstance(request.user, AnonymousUser):
@@ -698,3 +701,14 @@ class Verify2FASetupAPIView(APIView):
         it will return the existing token.
         
         """
+        
+@api_view(["GET"])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def whoami_view(request):
+    """
+    Returns authenticated user details for auth integration.
+    """
+    user = request.user
+    serializer = CustomUserSerializer(user)
+    return Response(serializer.data)

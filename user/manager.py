@@ -3,6 +3,8 @@ from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
+from user.models import RoleChoices
+
 class CustomUserManager(BaseUserManager):
     """
     Custom user model manager where email is the unique identifier
@@ -18,7 +20,11 @@ class CustomUserManager(BaseUserManager):
             validate_email(email)
         except ValidationError:
             raise ValueError(_("Invalid email format"))
+        
         email = self.normalize_email(email)
+        
+        extra_fields.setdefault("role", RoleChoices.TECHNOLOGIST)
+        
         user = self.model(email=email, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
