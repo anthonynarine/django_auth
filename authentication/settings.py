@@ -134,6 +134,7 @@ AUTH_PASSWORD_VALIDATORS = [
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:3001",
+    "http://localhost:5173", 
     "https://ant-django-auth-62cf01255868.herokuapp.com",
     'https://gait.netlify.app',
     # Additional origins...
@@ -143,6 +144,7 @@ CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:3000',
     'http://localhost:3001',
+    "http://localhost:5173",
     "https://ant-django-auth-62cf01255868.herokuapp.com",
     'https://gait.netlify.app',
     # Additional trusted origins...
