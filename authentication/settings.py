@@ -192,6 +192,24 @@ AUTH_PASSWORD_VALIDATORS = [
     # },
 ]
 
+# Password reset links are single-use (the Reset row is deleted after use),
+# but must also expire on their own -- see check_token() in
+# ResetPasswordRequestView (user/views.py), which enforces this timeout.
+PASSWORD_RESET_TIMEOUT = 3600  # 1 hour
+
+REST_FRAMEWORK = {
+    # ScopedRateThrottle is a no-op for any view without a `throttle_scope`
+    # attribute, so enabling it globally doesn't affect unrelated views.
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.ScopedRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'login': '5/min',
+        'otp_verify': '5/min',
+        'password_reset': '5/min',
+    },
+}
+
 if settings.DEBUG:
     # Development settings
     SESSION_COOKIE_SECURE = False

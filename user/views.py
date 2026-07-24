@@ -36,6 +36,7 @@ from django.views.decorators.csrf import csrf_exempt
 
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.throttling import ScopedRateThrottle
 
 import pyotp
 import qrcode
@@ -119,7 +120,6 @@ class RegisterAPIView(APIView):
             return Response({"error": {"password": str(e)}}, status=status.HTTP_400_BAD_REQUEST)
 
         # Initialize the serializer with the modified data
-        logger.debug("RegisterAPIView: Received request with data: %s", request.data)
         serializer = CustomUserSerializer(data=data)
         try:
             serializer.is_valid(raise_exception=True)
@@ -182,11 +182,10 @@ class LoginAPIView(APIView):
     """
 
     permission_classes = [AllowAny]  # Allow access to any user regardless of their authentication status.
+    throttle_scope = "login"
 
     def post(self, request):
         print("LoginAPIView: Request reached")
-
-        logger.info("LoginAPIView: Received request with data: %s", request.data)
         """
         Handle POST request to authenticate a user.
 
@@ -206,7 +205,6 @@ class LoginAPIView(APIView):
             Response: Django REST Framework response object with either error message and status code
                     or successful login data and tokens.
         """
-        logger.info("LoginAPIView: Received request with data: %s", request.data)
         data = request.data.copy()  # Copy data to prevent mutable data issues.
         email = data.get("email", "").strip().lower()  # Normalize email to ensure case-insensitive comparison.
         password = data.get("password")
@@ -263,10 +261,6 @@ class LoginAPIView(APIView):
                 "refresh_token": refresh_token
             }, status=status.HTTP_200_OK)
                         
-            # Add debug logs to ensure tokens are being generated correctly
-            logger.debug(f"Access Token created: {access_token}")
-            logger.debug(f"Refresh Token created: {refresh_token}")
-            
             logger.info(f"Successful login for {email}. Full access tokens created and sent.")
             return response
         except Exception as e:
@@ -278,7 +272,9 @@ class TwoFactorLoginAPIView(APIView):
     """
     Handles the verification of the second factor for users with 2FA enabled.
     """
-    
+
+    throttle_scope = "otp_verify"
+
     def post(self, request):
         """
         Processes a 2FA verification request. Validates the OTP provided by the user against the user's tfa_secret.
@@ -287,13 +283,7 @@ class TwoFactorLoginAPIView(APIView):
         data = request.data
         otp = data.get("otp")  # Extract the OTP from the request data
         temp_token = request.COOKIES.get("temp_token")  # Get the temporary token from cookies
-        
-        # Log the received OTP and temp_token
-        logger.debug(f"Received OTP: {otp}")
-        logger.debug(f"Received temp_token: {temp_token}")
-        logger.debug(f"Request cookies: {request.COOKIES}")
-        logger.debug(f"Request headers: {request.headers}")
-        
+
         # Check if both OTP and temporary token are provided
         if not otp or not temp_token:
             logger.warning("Missing OTP or temporary token")
@@ -326,10 +316,7 @@ class TwoFactorLoginAPIView(APIView):
             logger.debug("OTP verification successful")
             access_token = create_access_token(user.id)
             refresh_token = create_refresh_token(user.id)
-            
-            logger.debug(f"Access token created: {access_token}")  
-            logger.debug(f"Refresh token created: {refresh_token}") 
-            
+
             # Store the refresh token in the database with an expiration date
             UserToken.objects.create(
                 user_id=user.id,
@@ -382,9 +369,6 @@ class ValidateSessionAPIView(APIView):
     authentication_classes = [JWTAuthentication]
 
     def get(self, request):
-        # Log the headers to see if the Authorization header is present
-        logger.debug(f"Request headers: {request.headers}")
-        
         # Check if the request.user is an instance of AnonymousUser
         if isinstance(request.user, AnonymousUser):
             # If so, return a 401 Unauthorized response
@@ -410,10 +394,7 @@ class RefreshAPIView(APIView):
             refresh_token = auth_header.split(' ')[1]
         else:
             refresh_token = None
-        
-        # Log the received refresh token and user_id
-        logger.debug(f"Received refresh token: {refresh_token}")  
-        
+
         if not refresh_token:
             raise exceptions.AuthenticationFailed("Refresh token not found in headers")
         
@@ -427,8 +408,7 @@ class RefreshAPIView(APIView):
             raise exceptions.AuthenticationFailed("unauthenticated")
         
         access_token = create_access_token(user_id)
-        logger.debug(f"New access token created: {access_token}") 
-        
+
         response = Response({
             "message": "Token refreshed successfully.",
             "access_token": access_token,
@@ -438,7 +418,6 @@ class RefreshAPIView(APIView):
 @method_decorator(csrf_exempt, name='dispatch')        
 class LogoutAPIView(APIView):
     def post(self, request):
-        logger.info("LogoutAPIView: Received request with cookies: %s", request.COOKIES)
         refresh_token = request.COOKIES.get("refresh_token")
         UserToken.objects.filter(token=refresh_token).delete()
         
@@ -457,6 +436,7 @@ class ForgotPasswordRequestView(APIView):
     Allows any user (authenticated or not) to request a password reset link.
     """
     permission_classes = [AllowAny]
+    throttle_scope = "password_reset"
 
     def post(self, request):
         """
@@ -493,7 +473,6 @@ class ForgotPasswordRequestView(APIView):
         react_app_base_url = settings.REACT_APP_BASE_URL
         uid_encoded = urlsafe_base64_encode(force_bytes(user.pk))
         reset_link = f"{react_app_base_url}/reset-password/{uid_encoded}/{token}"
-        logger.debug(f"ForgotPasswordRequestView: Generated reset link: {reset_link}")
 
         # Prepare HTML and plain text versions of the password reset email.
         html_content = render_to_string("email/password_reset_email.html", {"reset_link": reset_link})
@@ -526,9 +505,7 @@ class ResetPasswordRequestView(APIView):
         password = data.get("password")
         password_confirm = data.get("password_confirm")
         token = data.get("token")
-        logger.debug(f"Request data: {data}")
-  
-        
+
         # VAlidate required fields
         if not all([password, password_confirm, token]):
             return Response({
@@ -550,7 +527,16 @@ class ResetPasswordRequestView(APIView):
         with transaction.atomic():
             logger.info("ResetPasswordRequestView: Attempting to retrieve reset record.")
             reset_password = get_object_or_404(Reset, token=token)
-            user = get_object_or_404(User, email=reset_password.email) 
+            user = get_object_or_404(User, email=reset_password.email)
+
+            # check_token() verifies the token is both authentic and still
+            # within PASSWORD_RESET_TIMEOUT. Without this, a reset link never
+            # expires on its own -- the Reset row only ever goes away once used.
+            if not PasswordResetTokenGenerator().check_token(user, token):
+                return Response(
+                    {"error": "This password reset link is invalid or has expired."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
             # Set the new password and save the user
             user.set_password(password)
@@ -625,6 +611,9 @@ class Verify2FASetupAPIView(APIView):
     Methods:
         post(request, *args, **kwargs): Verifies the OTP and completes the 2FA setup process if the OTP is correct.
     """
+
+    throttle_scope = "otp_verify"
+
     @method_decorator(login_required)
     def post(self, request, *args, **kwargs):
         """

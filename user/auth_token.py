@@ -83,9 +83,8 @@ def create_refresh_token(user_id):
         A JWT refresh token as a string, encoded with HS256 algorithm.
     """
     user = User.objects.get(id=user_id)
-    
+
     # Payload of the token with user_id, expiration time (7 days from now), and issued at time.
-    logger.debug(f"JWT_REFRESH_SECRET used for signing: {JWT_REFRESH_SECRET}")
     payload = {
         "user_id": user_id,  # Unique identifier for the user
         "email": user.email,
@@ -97,9 +96,6 @@ def create_refresh_token(user_id):
     return jwt.encode(payload, JWT_REFRESH_SECRET, algorithm="HS256")
 
 def decode_refresh_token(token):
-    logger.info(f"Received refresh token for decoding: {token}")
-    logger.debug(f"Using JWT_REFRESH_SECRET for decoding: {JWT_REFRESH_SECRET}")
-    
     try:
         payload = jwt.decode(token, JWT_REFRESH_SECRET, algorithms="HS256")
         return payload["user_id"]
