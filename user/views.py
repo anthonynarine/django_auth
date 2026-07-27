@@ -4,8 +4,6 @@ from io import BytesIO
 import logging
 import os
 
-from decouple import config
-
 # Third-party imports
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth import get_user_model, authenticate, login, logout
@@ -41,16 +39,13 @@ from rest_framework.throttling import ScopedRateThrottle
 import pyotp
 import qrcode
 
-# Sendgrid email
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail
-
 from authentication.settings import ACCESS_TOKEN_SAMESITE, REFRESH_TOKEN_SAMESITE
 
 # Local application/library specific imports
 from .auth_token import JWT_ACCESS_SECRET, create_access_token, create_refresh_token, decode_refresh_token, JWTAuthentication, create_temporary_2fa_token, decode_temporary_token
 from .models import CustomUser, UserToken, Reset
 from .serializers import CustomUserSerializer
+from .guest import DEMO_USER_EMAIL
 from .rabbitmq_producer import send_user_registered_message
 from django.http import HttpResponse
 from django.conf import settings
@@ -151,18 +146,12 @@ class RegisterAPIView(APIView):
         try:
             html_content = render_to_string("email/thank_you_email.html", {})
             text_content = strip_tags(html_content)
-            
-            sg = SendGridAPIClient(config("SENDGRID_API_KEY"))
-            from_email = settings.DEFAULT_FROM_EMAIL
-            to_email = email
             subject = "Thank you for testing out this application"
-            
-            content = Mail(from_email=from_email, to_emails=to_email, subject=subject, html_content=html_content)
-            content.plain_text_content = text_content
-            
-            response = sg.send(content)
-            logger.info(f"Welcome email sent to {to_email}: {response.status_code}")
-            logger.info(f"SendGrid response body: {response.body}")
+
+            message = EmailMultiAlternatives(subject, text_content, settings.DEFAULT_FROM_EMAIL, [email])
+            message.attach_alternative(html_content, "text/html")
+            message.send()
+            logger.info(f"Welcome email sent to {email}")
         except Exception as e:
             logger.error(f"Failed to send welcome email to {email}: {e}", exc_info=True)
 
@@ -266,6 +255,46 @@ class LoginAPIView(APIView):
         except Exception as e:
             # Handle exceptions related to full access token creation
             logger.error(f"Error creating tokens for user {email}: {str(e)}")
+            return Response({'error': 'Unable to create tokens'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@method_decorator(csrf_exempt, name='dispatch')
+class GuestLoginAPIView(APIView):
+    """
+    Issues real access/refresh tokens for a fixed demo account, with no
+    credentials required, so a portfolio visitor can try the app instantly.
+
+    Backed by the account created/reset by the `seed_demo_user` management
+    command. That account never has 2FA enabled, so this always returns
+    tokens directly rather than branching into the 2FA flow like
+    LoginAPIView does.
+    """
+
+    permission_classes = [AllowAny]
+    throttle_scope = "login"
+
+    def post(self, request):
+        try:
+            user = User.objects.get(email=DEMO_USER_EMAIL)
+        except User.DoesNotExist:
+            logger.error("Guest login requested but the demo user does not exist. Run `manage.py seed_demo_user`.")
+            return Response({"error": "Guest login is not available right now."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        try:
+            access_token = create_access_token(user.id)
+            refresh_token = create_refresh_token(user.id)
+            UserToken.objects.create(
+                user_id=user.id,
+                token=refresh_token,
+                expired_at=timezone.now() + timedelta(days=7)
+            )
+            logger.info("Guest login issued.")
+            return Response({
+                "message": "Logged in as guest.",
+                "access_token": access_token,
+                "refresh_token": refresh_token
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.error(f"Error creating tokens for guest login: {str(e)}")
             return Response({'error': 'Unable to create tokens'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class TwoFactorLoginAPIView(APIView):
@@ -388,15 +417,17 @@ class ValidateSessionAPIView(APIView):
 class RefreshAPIView(APIView):
     
     def post(self, request):
-        # Extract the refresh token from the Authorization header
+        # Prefer the Authorization header (explicit, not ambient). Fall back
+        # to the request body for clients that transport the refresh token
+        # differently -- e.g. Lumen's dev-mode client sends {"refresh": "..."}.
         auth_header = request.headers.get("Authorization")
         if auth_header and auth_header.startswith("Bearer"):
             refresh_token = auth_header.split(' ')[1]
         else:
-            refresh_token = None
+            refresh_token = request.data.get("refresh_token") or request.data.get("refresh")
 
         if not refresh_token:
-            raise exceptions.AuthenticationFailed("Refresh token not found in headers")
+            raise exceptions.AuthenticationFailed("Refresh token not found in headers or request body")
         
         user_id = decode_refresh_token(refresh_token)
         
@@ -479,16 +510,11 @@ class ForgotPasswordRequestView(APIView):
         text_content = strip_tags(html_content)  # Plain text version for email clients that do not support HTML.
 
         try:
-            # Setup and send the email through SendGrid.
-            sg = SendGridAPIClient(config("SENDGRID_API_KEY"))
-            from_email = settings.DEFAULT_FROM_EMAIL
-            to_email = email
             subject = "Reset Your Password"
-            content = Mail(from_email=from_email, to_emails=to_email, subject=subject, html_content=html_content)
-            response = sg.send(content)
-            # Log the outcome of sending the email.
-            logger.info(f"Password reset email sent to {to_email}: {response.status_code}")
-            logger.info(f"SendGrid response body: {response.body}")
+            message = EmailMultiAlternatives(subject, text_content, settings.DEFAULT_FROM_EMAIL, [email])
+            message.attach_alternative(html_content, "text/html")
+            message.send()
+            logger.info(f"Password reset email sent to {email}")
         except Exception as e:
             # Log any failures with sending the email.
             logger.error(f"Failed to send password reset email: {e}")

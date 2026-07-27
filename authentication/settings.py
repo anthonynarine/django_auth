@@ -160,10 +160,16 @@ if not JWT_ACCESS_SECRET or not JWT_REFRESH_SECRET:
     sys.exit(1)
 
 
-# Email Settings
+# Email Settings (Zoho Mail via SMTP)
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL")
-EMAIL_BACKEND = 'sendgrid_backend.SendgridBackend'
-SENDGRID_API_KEY = config("SENDGRID_API_KEY")
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = config("EMAIL_HOST", default="smtp.zoho.com")
+EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)
+EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
+# Zoho requires an app-specific password here (not the account login
+# password) when 2FA is enabled on the mailbox.
+EMAIL_HOST_USER = config("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD")
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -207,6 +213,7 @@ REST_FRAMEWORK = {
         'login': '5/min',
         'otp_verify': '5/min',
         'password_reset': '5/min',
+        'contact': '5/min',
     },
 }
 

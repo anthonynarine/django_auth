@@ -35,6 +35,7 @@ class TokenAuthenticationMiddleware(MiddlewareMixin):
         '/api/send-email/',
         '/api/register/',
         '/api/login/',
+        '/api/guest-login/',
         '/api/logout/',
         '/api/two-factor-login/',
         '/api/forgot-password/',

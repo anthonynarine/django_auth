@@ -1,9 +1,12 @@
 import logging
-from decouple import config
+
+from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.core.mail import EmailMultiAlternatives
+from django.core.validators import validate_email
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail
+from rest_framework.permissions import AllowAny
 from rest_framework import status
 
 # Configure logging
@@ -12,50 +15,62 @@ logger = logging.getLogger(__name__)
 
 class SendEmailAPIView(APIView):
     """
-    API view to handle sending emails using SendGrid.
+    Contact-form endpoint. Always delivers to DEFAULT_FROM_EMAIL (the site
+    owner's own inbox) -- the recipient is never client-controlled. An
+    endpoint that lets an anonymous caller pick an arbitrary "to" address
+    while sending through our own mailbox is an open spam relay, not a
+    contact form, so the visitor's email is only ever used as the Reply-To
+    header.
     """
+
+    permission_classes = [AllowAny]
+    throttle_scope = "contact"
+
     def post(self, request, *args, **kwargs):
         """
-        Handle POST request to send an email.
+        Handle POST request to send a contact-form email.
 
         Expected request data:
         {
-            "from_email": "sender_email@example.com",
-            "to_email": "recipient_email@example.com",
+            "reply_to": "visitor_email@example.com",
             "subject": "Email subject",
-            "content": "HTML content of the email"
+            "content": "Plain text content of the email"
         }
 
         Returns:
             Response: JSON response indicating success or failure of email sending.
         """
-        email_data = request.data
-        
-        # Log the incoming request data
-        logger.info("Received email send request with data: %s", email_data)
-        
-        # Create the email message
-        email_message = Mail(
-            from_email=email_data.get("from_email"),
-            to_emails=email_data.get("to_email"),
-            subject=email_data.get("subject"),
-            html_content=email_data.get("content"),
-        )
-        
+        data = request.data
+        reply_to = data.get("reply_to", "").strip()
+        subject = data.get("subject", "").strip()
+        content = data.get("content", "").strip()
+
+        if not reply_to or not subject or not content:
+            return Response(
+                {"error": "reply_to, subject, and content are all required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         try:
-            # Send the email using SendGrid
-            sg = SendGridAPIClient(config("SENDGRID_API_KEY"))
-            sg_response = sg.send(email_message)
-            
-            # Log the SendGrid response
-            logger.info("SendGrid response status: %s", sg_response.status_code)
-            logger.info("SendGrid response body: %s", sg_response.body)
-            
-            # Return success response
+            validate_email(reply_to)
+        except ValidationError:
+            return Response({"error": "Invalid email format"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            message = EmailMultiAlternatives(
+                subject=f"[Contact form] {subject}",
+                body=content,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=[settings.DEFAULT_FROM_EMAIL],
+                reply_to=[reply_to],
+            )
+            message.send()
+
+            logger.info("Contact form email sent, reply-to %s", reply_to)
             return Response({"message": "Email sent successfully"}, status=status.HTTP_200_OK)
         except Exception as e:
             # Log the detailed error
-            logger.error("Error sending email", exc_info=True)
-            
+            logger.error("Error sending contact form email", exc_info=True)
+
             # Return error response
             return Response({"error": "Error sending email: " + str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
