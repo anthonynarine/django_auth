@@ -16,7 +16,8 @@ from django.urls import reverse
 from django.utils import timezone
 
 from authentication.custom_middleware.disable_csrf import DisableCSRFMiddleware
-from user.models import Reset
+from user.auth_token import create_refresh_token
+from user.models import Reset, UserToken
 
 User = get_user_model()
 
@@ -138,3 +139,70 @@ class DisableCSRFMiddlewareAllowlistTest(TestCase):
         request = self.factory.post("/api/some-new-endpoint-not-yet-added/")
         self.middleware.process_request(request)
         self.assertFalse(getattr(request, "_dont_enforce_csrf_checks", False))
+
+
+class RefreshTokenTransportTest(TestCase):
+    """
+    RefreshAPIView must accept the refresh token from the Authorization
+    header (primary) or the request body (fallback, for clients like
+    Lumen's dev-mode authApi that send {"refresh": "..."}).
+    """
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(email="refreshme@example.com", password="whatever-password")
+        self.refresh_token = create_refresh_token(self.user.id)
+        UserToken.objects.create(
+            user=self.user,
+            token=self.refresh_token,
+            expired_at=timezone.now() + timedelta(days=7),
+        )
+
+    def test_refresh_via_authorization_header(self):
+        response = self.client.post(
+            reverse("refresh"),
+            {},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Bearer {self.refresh_token}",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("access_token", response.json())
+
+    def test_refresh_via_body_key_refresh(self):
+        response = self.client.post(
+            reverse("refresh"),
+            {"refresh": self.refresh_token},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("access_token", response.json())
+
+    def test_refresh_via_body_key_refresh_token(self):
+        response = self.client.post(
+            reverse("refresh"),
+            {"refresh_token": self.refresh_token},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("access_token", response.json())
+
+    def test_stale_access_token_in_header_is_rejected(self):
+        """
+        Sending an access token (wrong secret) where a refresh token is
+        expected must fail -- this is exactly the bug found in Lumen's
+        frontend: a stale access token left on the Authorization header
+        instead of the refresh token.
+        """
+        from user.auth_token import create_access_token
+
+        stale_access_token = create_access_token(self.user.id)
+        response = self.client.post(
+            reverse("refresh"),
+            {},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Bearer {stale_access_token}",
+        )
+        # RefreshAPIView has no authentication_classes, so DRF downgrades
+        # AuthenticationFailed to 403 (no WWW-Authenticate header to justify
+        # 401) -- pre-existing behavior, unrelated to this fix.
+        self.assertEqual(response.status_code, 403)
