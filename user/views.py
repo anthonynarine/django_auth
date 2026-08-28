@@ -42,8 +42,13 @@ import qrcode
 from authentication.settings import ACCESS_TOKEN_SAMESITE, REFRESH_TOKEN_SAMESITE
 
 # Local application/library specific imports
-from .auth_token import JWT_ACCESS_SECRET, create_access_token, create_refresh_token, decode_refresh_token, JWTAuthentication, create_temporary_2fa_token, decode_temporary_token
+from .auth_token import JWT_ACCESS_SECRET, create_access_token, JWTAuthentication, create_temporary_2fa_token, decode_temporary_token
 from .models import CustomUser, UserToken, Reset
+from .refresh_tokens import (
+    issue_refresh_token,
+    revoke_refresh_token,
+    rotate_refresh_token,
+)
 from .serializers import CustomUserSerializer
 from .guest import DEMO_USER_EMAIL
 from .rabbitmq_producer import send_user_registered_message
@@ -238,16 +243,11 @@ class LoginAPIView(APIView):
         # If 2FA is not enabled, proceed with creating access and refresh tokens
         try:
             access_token = create_access_token(user.id)
-            refresh_token = create_refresh_token(user.id)
-            UserToken.objects.create(
-                user_id=user.id,
-                token=refresh_token,
-                expired_at=timezone.now() + timedelta(days=7)
-            )
+            issued_refresh = issue_refresh_token(user, request=request)
             response = Response({
                 "message": "Logged in successfully.",
                 "access_token": access_token,
-                "refresh_token": refresh_token
+                "refresh_token": issued_refresh.token
             }, status=status.HTTP_200_OK)
                         
             logger.info(f"Successful login for {email}. Full access tokens created and sent.")
@@ -281,17 +281,12 @@ class GuestLoginAPIView(APIView):
 
         try:
             access_token = create_access_token(user.id)
-            refresh_token = create_refresh_token(user.id)
-            UserToken.objects.create(
-                user_id=user.id,
-                token=refresh_token,
-                expired_at=timezone.now() + timedelta(days=7)
-            )
+            issued_refresh = issue_refresh_token(user, request=request)
             logger.info("Guest login issued.")
             return Response({
                 "message": "Logged in as guest.",
                 "access_token": access_token,
-                "refresh_token": refresh_token
+                "refresh_token": issued_refresh.token
             }, status=status.HTTP_200_OK)
         except Exception as e:
             logger.error(f"Error creating tokens for guest login: {str(e)}")
@@ -344,14 +339,7 @@ class TwoFactorLoginAPIView(APIView):
             # OTP verification successful; proceed with generating tokens
             logger.debug("OTP verification successful")
             access_token = create_access_token(user.id)
-            refresh_token = create_refresh_token(user.id)
-
-            # Store the refresh token in the database with an expiration date
-            UserToken.objects.create(
-                user_id=user.id,
-                token=refresh_token,
-                expired_at=timezone.now() + timedelta(days=7)
-            )
+            issued_refresh = issue_refresh_token(user, request=request)
             logger.debug(f"Refresh token stored in DB for user_id: {user.id}")  
             
             csrf_token = get_token(request)
@@ -359,7 +347,7 @@ class TwoFactorLoginAPIView(APIView):
             response = Response({
                 "message": "2FA verification successful",
                 "access_token": access_token,
-                "refresh_token": refresh_token
+                "refresh_token": issued_refresh.token
             }, status=status.HTTP_200_OK)
             
             # Set the CSRF token as a cookie
@@ -429,28 +417,29 @@ class RefreshAPIView(APIView):
         if not refresh_token:
             raise exceptions.AuthenticationFailed("Refresh token not found in headers or request body")
         
-        user_id = decode_refresh_token(refresh_token)
-        
-        if not UserToken.objects.filter(
-            user=user_id,
-            token=refresh_token,
-            expired_at__gt=timezone.now()
-        ).exists(): 
-            raise exceptions.AuthenticationFailed("unauthenticated")
-        
-        access_token = create_access_token(user_id)
+        rotated = rotate_refresh_token(refresh_token, request=request)
 
         response = Response({
             "message": "Token refreshed successfully.",
-            "access_token": access_token,
+            "access_token": rotated.access_token,
+            "refresh_token": rotated.refresh_token,
         }, status=status.HTTP_200_OK)
                 
         return response
 @method_decorator(csrf_exempt, name='dispatch')        
 class LogoutAPIView(APIView):
     def post(self, request):
-        refresh_token = request.COOKIES.get("refresh_token")
-        UserToken.objects.filter(token=refresh_token).delete()
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer"):
+            refresh_token = auth_header.split(' ')[1]
+        else:
+            refresh_token = (
+                request.COOKIES.get("refresh_token")
+                or request.data.get("refresh_token")
+                or request.data.get("refresh")
+            )
+        if refresh_token:
+            revoke_refresh_token(refresh_token, reason="LOGOUT")
         
         response = Response()
         logout(request)
@@ -675,22 +664,17 @@ class Verify2FASetupAPIView(APIView):
                     # Invalidate old refresh token
                     old_refresh_token = request.COOKIES.get("refresh_token")
                     if old_refresh_token:
-                        UserToken.objects.filter(user=user, token=old_refresh_token).delete()
+                        revoke_refresh_token(old_refresh_token, reason="MFA_SETUP_COMPLETED")
                     
                     # Create new access and refresh tokens
                     new_access_token = create_access_token(user.id)
-                    new_refresh_token = create_refresh_token(user.id)
-                    UserToken.objects.create(
-                        user=user,
-                        token=new_refresh_token,
-                        expired_at=timezone.now() + timedelta(days=7) 
-                    )
+                    issued_refresh = issue_refresh_token(user, request=request)
                     
                     # Prepare and send the response with the new tokens
                     response = Response({
                         "message": "2FA setup complete, new tokens issued",
                         "access_token": new_access_token,
-                        "refresh_token": new_refresh_token
+                        "refresh_token": issued_refresh.token
                     }, status=status.HTTP_200_OK)
                     
                     # Set CSRF token (this is good security practice)

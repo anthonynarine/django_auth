@@ -94,8 +94,33 @@ class UserToken(models.Model):
     token = models.CharField(
         max_length=512,
         unique=True,
+        null=True,
+        blank=True,
         verbose_name='Token',
-        help_text='The actual token string. Must be unique.'
+        help_text='Legacy raw token string. New refresh tokens store only a hash.'
+    )
+    token_hash = models.CharField(
+        max_length=64,
+        unique=True,
+        null=True,
+        blank=True,
+        db_index=True,
+        verbose_name='Token Hash',
+        help_text='HMAC-SHA256 digest used to look up hardened refresh tokens.'
+    )
+    jti = models.UUIDField(
+        unique=True,
+        null=True,
+        blank=True,
+        verbose_name='JWT ID',
+        help_text='Unique identifier embedded in hardened refresh JWTs.'
+    )
+    family_id = models.UUIDField(
+        null=True,
+        blank=True,
+        db_index=True,
+        verbose_name='Token Family ID',
+        help_text='Identifier shared by rotated refresh tokens from one login.'
     )
     created_at = models.DateTimeField(
         auto_now_add=True,
@@ -111,11 +136,50 @@ class UserToken(models.Model):
         verbose_name='Is Revoked',
         help_text='Indicates whether this token has been revoked.'
     )
+    consumed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Consumed At',
+        help_text='When this refresh token was rotated and made single-use.'
+    )
+    revoked_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Revoked At',
+        help_text='When this refresh token was explicitly revoked.'
+    )
+    revocation_reason = models.CharField(
+        max_length=64,
+        blank=True,
+        default='',
+        verbose_name='Revocation Reason'
+    )
+    replaced_by_jti = models.UUIDField(
+        null=True,
+        blank=True,
+        verbose_name='Replacement JWT ID',
+        help_text='JTI of the refresh token issued when this token was consumed.'
+    )
+    created_ip = models.GenericIPAddressField(null=True, blank=True)
+    last_used_ip = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True, default='')
     last_used_at = models.DateTimeField(
         auto_now=True,
         verbose_name='Last Used At',
         help_text='The last date and time this token was used.'
     )
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["family_id", "revoked_at"],
+                name="user_userto_family_6cc020_idx",
+            ),
+            models.Index(
+                fields=["user", "family_id"],
+                name="user_userto_user_id_2217ff_idx",
+            ),
+        ]
 
     def __str__(self):
         return f"Token for {self.user}"

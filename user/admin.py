@@ -12,5 +12,5 @@ class UserAdmin(admin.ModelAdmin):
     
 @admin.register(UserToken)
 class UserTokenAdmin(admin.ModelAdmin):
-    fields = ["user", "token", "last_used_at", "is_revoked"]
-    list_display = ["user", "token", "last_used_at", "is_revoked"]
+    fields = ["user", "last_used_at", "is_revoked"]
+    list_display = ["user", "last_used_at", "is_revoked"]

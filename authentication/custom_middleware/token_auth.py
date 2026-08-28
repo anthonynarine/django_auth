@@ -86,6 +86,7 @@ class TokenAuthenticationMiddleware(MiddlewareMixin):
 
         # Attempt to retrieve the "accessToken" from the reequest cookies
         token = request.COOKIES.get("access_token")
+        token_source = "cookie" if token else ""
         
         # If the toke is not found in the cookies, check the Authrozation header
         if not token:
@@ -94,14 +95,18 @@ class TokenAuthenticationMiddleware(MiddlewareMixin):
             if auth_header and auth_header.startswith("Bearer"):
                 # Extract the token fromt he "Bearer" <Token> format
                 token = auth_header.split(" ")[1]
+                token_source = "header"
                 
         if token:
             try:
                 # Decode the JWT token to validate and extract user information
-                logger.debug(f"Token found: {token}")
+                logger.debug(
+                    "JWT access token found",
+                    extra={"token_source": token_source, "request_path": request.path_info},
+                )
                 payload = jwt.decode(token, settings.JWT_ACCESS_SECRET, algorithms=["HS256"])
                 user_id = payload.get("user_id")
-                logger.debug(f"Token payload: {payload}")
+                logger.debug("JWT payload decoded for user_id=%s", user_id)
                 # Fetch the user from the database and attatch to the request
                 request.user = User.objects.get(pk=user_id)
                 logger.debug(f"User {user_id} authenticated successfully via JWT.")

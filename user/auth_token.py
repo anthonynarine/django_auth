@@ -2,6 +2,7 @@
 from datetime import datetime, timedelta, timezone
 import logging
 import os 
+import uuid
 
 
 # Third-party imports
@@ -68,7 +69,7 @@ def decode_access_token(token):
         logger.error(f"{RED}Unexpected error decoding token: {str(e)}{END}")
         raise exceptions.AuthenticationFailed(f"Token cannot be decoded: {str(e)}")
 
-def create_refresh_token(user_id):
+def create_refresh_token(user_id, family_id=None, jti=None):
     """
     Generates a JWT refresh token for a given user ID.
     
@@ -83,12 +84,17 @@ def create_refresh_token(user_id):
         A JWT refresh token as a string, encoded with HS256 algorithm.
     """
     user = User.objects.get(id=user_id)
+    family_id = family_id or uuid.uuid4()
+    jti = jti or uuid.uuid4()
 
     # Payload of the token with user_id, expiration time (7 days from now), and issued at time.
     payload = {
         "user_id": user_id,  # Unique identifier for the user
         "email": user.email,
         "role": user.role,
+        "type": "refresh",
+        "jti": str(jti),
+        "family_id": str(family_id),
         "exp": datetime.now(timezone.utc) + timedelta(days=7),  # Token expiration time (7 days from now)
         "iat": datetime.now(timezone.utc)  # Token issue time
     }
@@ -97,7 +103,7 @@ def create_refresh_token(user_id):
 
 def decode_refresh_token(token):
     try:
-        payload = jwt.decode(token, JWT_REFRESH_SECRET, algorithms="HS256")
+        payload = jwt.decode(token, JWT_REFRESH_SECRET, algorithms=["HS256"])
         return payload["user_id"]
     except jwt.ExpiredSignatureError:
         raise exceptions.AuthenticationFailed("The token has expired.")

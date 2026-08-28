@@ -17,10 +17,19 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('SECRET_KEY')
 DEBUG = config('DEBUG', default=True, cast=bool)
 
+def csv_config(name):
+    return [
+        item.strip()
+        for item in config(name, default="").split(",")
+        if item.strip()
+    ]
+
 ALLOWED_HOSTS = [
     'ant-django-auth-62cf01255868.herokuapp.com',
     'localhost', '127.0.0.1',
-    "localhost:3000"]
+    "localhost:3000",
+    *csv_config("ALLOWED_HOSTS_EXTRA"),
+]
 
 # Decide which React app base URL to use based on DEBUG
 REACT_APP_BASE_URL = config(
@@ -138,6 +147,7 @@ CORS_ALLOWED_ORIGINS = [
     "https://ant-django-auth-62cf01255868.herokuapp.com",
     'https://gait.netlify.app',
     # Additional origins...
+    *csv_config("CORS_ALLOWED_ORIGINS_EXTRA"),
 ]
 CORS_ALLOW_CREDENTIALS = True
 
@@ -148,12 +158,18 @@ CSRF_TRUSTED_ORIGINS = [
     "https://ant-django-auth-62cf01255868.herokuapp.com",
     'https://gait.netlify.app',
     # Additional trusted origins...
+    *csv_config("CSRF_TRUSTED_ORIGINS_EXTRA"),
 ]
 
 
 # JWT Secretes
 JWT_REFRESH_SECRET = config('JWT_REFRESH_SECRET')
 JWT_ACCESS_SECRET = config('JWT_ACCESS_SECRET', default='')
+JWT_REFRESH_ROTATION_ENABLED = config(
+    'JWT_REFRESH_ROTATION_ENABLED',
+    default=True,
+    cast=bool,
+)
 
 if not JWT_ACCESS_SECRET or not JWT_REFRESH_SECRET:
     print('JWT secrets are not set. Application is shutting down.')
