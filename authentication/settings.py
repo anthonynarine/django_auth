@@ -170,6 +170,19 @@ JWT_REFRESH_ROTATION_ENABLED = config(
     default=True,
     cast=bool,
 )
+AUTH_SESSION_ENFORCEMENT = config(
+    "AUTH_SESSION_ENFORCEMENT",
+    default="OBSERVE",
+).upper()
+AUTH_SESSION_LIFETIME_DAYS = config(
+    "AUTH_SESSION_LIFETIME_DAYS",
+    default=7,
+    cast=int,
+)
+
+if AUTH_SESSION_ENFORCEMENT not in {"OFF", "OBSERVE", "ENFORCE"}:
+    print("AUTH_SESSION_ENFORCEMENT must be OFF, OBSERVE, or ENFORCE.")
+    sys.exit(1)
 
 if not JWT_ACCESS_SECRET or not JWT_REFRESH_SECRET:
     print('JWT secrets are not set. Application is shutting down.')

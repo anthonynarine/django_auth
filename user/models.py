@@ -1,4 +1,5 @@
 # Standard library imports
+import uuid
 from enum import unique
 
 
@@ -73,6 +74,71 @@ class CustomUser(AbstractUser):
     def __str__(self):
         return self.email
 
+
+class AuthSession(models.Model):
+    """Server-controlled authenticated session for a user."""
+
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+        verbose_name="Session ID",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="auth_sessions",
+        verbose_name="User",
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Created At",
+    )
+    last_seen_at = models.DateTimeField(
+        default=timezone.now,
+        verbose_name="Last Seen At",
+    )
+    expires_at = models.DateTimeField(
+        verbose_name="Expires At",
+    )
+    revoked_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Revoked At",
+    )
+    revocation_reason = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+        verbose_name="Revocation Reason",
+    )
+    authentication_method = models.CharField(
+        max_length=32,
+        default="password",
+        verbose_name="Authentication Method",
+    )
+    authentication_strength = models.CharField(
+        max_length=32,
+        default="password",
+        verbose_name="Authentication Strength",
+    )
+    recent_auth_at = models.DateTimeField(
+        default=timezone.now,
+        verbose_name="Recent Auth At",
+    )
+    created_ip = models.GenericIPAddressField(null=True, blank=True)
+    last_ip = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True, default="")
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["user", "revoked_at"], name="user_authses_user_revoked_idx"),
+            models.Index(fields=["expires_at"], name="user_authses_expires_idx"),
+        ]
+
+    def __str__(self):
+        return f"AuthSession({self.id}) for {self.user}"
+
 class UserToken(models.Model):
     """
     Model for storing refresh tokens for users.
@@ -90,6 +156,15 @@ class UserToken(models.Model):
         on_delete=models.CASCADE,
         verbose_name='User',
         help_text='The user who owns this token.'
+    )
+    auth_session = models.ForeignKey(
+        "AuthSession",
+        on_delete=models.CASCADE,
+        related_name="refresh_tokens",
+        null=True,
+        blank=True,
+        verbose_name="Auth Session",
+        help_text="Server-controlled session that owns this refresh token.",
     )
     token = models.CharField(
         max_length=512,
@@ -178,6 +253,10 @@ class UserToken(models.Model):
             models.Index(
                 fields=["user", "family_id"],
                 name="user_userto_user_id_2217ff_idx",
+            ),
+            models.Index(
+                fields=["auth_session", "revoked_at"],
+                name="user_userto_sess_revoked_idx",
             ),
         ]
 

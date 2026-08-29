@@ -1267,14 +1267,15 @@ The current company authentication work has already established or is establishi
 ```text
 ✓ authentication contract regression tests
 ✓ short-lived access JWT
-✓ refresh-token rotation
-✓ single-use refresh credentials
+✓ refresh-token rotation — production verified
+✓ single-use refresh credentials — production verified
 ✓ jti
 ✓ token families
-✓ replay detection
-✓ family-specific revocation
+✓ replay detection — production verified
+✓ family-specific revocation — production verified
 ✓ keyed hash storage for new refresh tokens
-◐ PostgreSQL concurrency protection implemented; PostgreSQL validation pending
+✓ PostgreSQL concurrency protection — production verified
+✓ browser-wide refresh coordination — production verified
 ```
 
 The company SHOULD continue building upward rather than bypassing these controls when introducing AI functionality.

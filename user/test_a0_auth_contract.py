@@ -139,8 +139,8 @@ class AccessTokenContractTest(TestCase):
         self.assertTrue(self.user.is_2fa_setup_in_progress)
         self.assertFalse(second_user.is_2fa_setup_in_progress)
 
-    def test_inactive_user_access_token_is_currently_accepted_security_gap(self):
-        # CURRENT SECURITY GAP - EXPECTED TO CHANGE IN A4.
+    def test_inactive_user_access_token_is_rejected_after_session_enforcement(self):
+        # CURRENT BEHAVIOR - EXPECTED UNDER A2 SESSION ENFORCEMENT.
         token = create_access_token(self.user.id)
         self.user.is_active = False
         self.user.save(update_fields=["is_active"])
@@ -150,7 +150,7 @@ class AccessTokenContractTest(TestCase):
             HTTP_AUTHORIZATION=f"Bearer {token}",
         )
 
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 401)
 
 
 class PublicProtectedEndpointContractTest(TestCase):
@@ -490,8 +490,7 @@ class PasswordResetContractTest(TestCase):
 
         self.assertEqual(response.status_code, 404)
 
-    def test_password_reset_currently_leaves_refresh_tokens_valid_security_gap(self):
-        # CURRENT SECURITY GAP - EXPECTED TO CHANGE IN A4.
+    def test_password_reset_revokes_existing_refresh_tokens(self):
         refresh_token = create_refresh_token(self.user.id)
         UserToken.objects.create(
             user=self.user,
@@ -516,7 +515,7 @@ class PasswordResetContractTest(TestCase):
         )
 
         self.assertEqual(reset_response.status_code, 202)
-        self.assertEqual(refresh_response.status_code, 200)
+        self.assertEqual(refresh_response.status_code, 403)
 
 
 class OtpContractTest(TestCase):

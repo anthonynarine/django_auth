@@ -14,6 +14,7 @@ from decouple import config
 
 # Local application/library specific imports
 from .serializers import CustomUserSerializer
+from .session_services import validate_access_session
 
 User = get_user_model()
 
@@ -29,7 +30,7 @@ GREEN = '\033[92m'
 END = '\033[0m'
 
         
-def create_access_token(user_id):
+def create_access_token(user_id, *, sid=None):
     """
     Generates a JWT access token for a given user ID.
     
@@ -49,16 +50,18 @@ def create_access_token(user_id):
         "email": user.email,
         "role": user.role,  # ✅ Inject the user's role into access token
         "exp": datetime.now(timezone.utc) + timedelta(minutes=15),  # Token expiration time (20 mins from now)
-        "iat": datetime.now(timezone.utc)  # Token issue time
+        "iat": datetime.now(timezone.utc),  # Token issue time
     }
+    if sid is not None:
+        payload["sid"] = str(sid)
     # Encoding the payload with a secret key and specifying HS256 as the algorithm
     return jwt.encode(payload, JWT_ACCESS_SECRET, algorithm="HS256")
 
-def decode_access_token(token):
+def decode_access_token_payload(token):
     try:
         payload = jwt.decode(token, JWT_ACCESS_SECRET, algorithms=["HS256"])
         logger.info(f"{GREEN}Access token validated for user_id={payload['user_id']}{END}")
-        return payload["user_id"]
+        return payload
     except jwt.ExpiredSignatureError:
         logger.warning(f"{RED}Token has expired{END}")
         raise jwt.ExpiredSignatureError("The token has expired.")
@@ -69,7 +72,12 @@ def decode_access_token(token):
         logger.error(f"{RED}Unexpected error decoding token: {str(e)}{END}")
         raise exceptions.AuthenticationFailed(f"Token cannot be decoded: {str(e)}")
 
-def create_refresh_token(user_id, family_id=None, jti=None):
+
+def decode_access_token(token):
+    """Compatibility wrapper that returns the authenticated user identifier."""
+    return decode_access_token_payload(token)["user_id"]
+
+def create_refresh_token(user_id, family_id=None, jti=None, sid=None):
     """
     Generates a JWT refresh token for a given user ID.
     
@@ -96,8 +104,10 @@ def create_refresh_token(user_id, family_id=None, jti=None):
         "jti": str(jti),
         "family_id": str(family_id),
         "exp": datetime.now(timezone.utc) + timedelta(days=7),  # Token expiration time (7 days from now)
-        "iat": datetime.now(timezone.utc)  # Token issue time
+        "iat": datetime.now(timezone.utc),  # Token issue time
     }
+    if sid is not None:
+        payload["sid"] = str(sid)
     # Encoding the payload with a secret key and specifying HS256 as the algorithm
     return jwt.encode(payload, JWT_REFRESH_SECRET, algorithm="HS256")
 
@@ -207,8 +217,12 @@ class JWTAuthentication(BaseAuthentication):
         if auth and len(auth) == 2 and auth[0].lower() == "bearer":
             token = auth[1]
             try:
-                user_id = decode_access_token(token)
+                payload = decode_access_token_payload(token)
+                user_id = payload["user_id"]
                 user = User.objects.get(pk=user_id)
+                session = validate_access_session(payload, user=user, request=request)
+                if session is not None:
+                    request.auth_session = session
                 logger.info(f"User object accessed for user_id={user_id}")
                 return (user, token)
             except jwt.ExpiredSignatureError:
@@ -220,6 +234,8 @@ class JWTAuthentication(BaseAuthentication):
             except User.DoesNotExist:
                 logger.error(f"User not found for user_id={user_id}")
                 raise exceptions.AuthenticationFailed("User not found", code=401)
+            except exceptions.AuthenticationFailed:
+                raise
             except Exception as e:
                 logger.error(f"Authentication Failed: {str(e)}")
                 raise exceptions.AuthenticationFailed(f"Authentication Failed: {str(e)}")

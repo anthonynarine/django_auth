@@ -49,6 +49,7 @@ from .refresh_tokens import (
     revoke_refresh_token,
     rotate_refresh_token,
 )
+from .session_services import create_session, revoke_all_sessions
 from .serializers import CustomUserSerializer
 from .guest import DEMO_USER_EMAIL
 from .rabbitmq_producer import send_user_registered_message
@@ -242,8 +243,14 @@ class LoginAPIView(APIView):
 
         # If 2FA is not enabled, proceed with creating access and refresh tokens
         try:
-            access_token = create_access_token(user.id)
-            issued_refresh = issue_refresh_token(user, request=request)
+            session = create_session(
+                user,
+                request=request,
+                authentication_method="password",
+                authentication_strength="password",
+            )
+            access_token = create_access_token(user.id, sid=session.id)
+            issued_refresh = issue_refresh_token(user, request=request, auth_session=session)
             response = Response({
                 "message": "Logged in successfully.",
                 "access_token": access_token,
@@ -280,8 +287,14 @@ class GuestLoginAPIView(APIView):
             return Response({"error": "Guest login is not available right now."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
         try:
-            access_token = create_access_token(user.id)
-            issued_refresh = issue_refresh_token(user, request=request)
+            session = create_session(
+                user,
+                request=request,
+                authentication_method="guest",
+                authentication_strength="guest",
+            )
+            access_token = create_access_token(user.id, sid=session.id)
+            issued_refresh = issue_refresh_token(user, request=request, auth_session=session)
             logger.info("Guest login issued.")
             return Response({
                 "message": "Logged in as guest.",
@@ -338,8 +351,14 @@ class TwoFactorLoginAPIView(APIView):
         if totp.verify(otp):
             # OTP verification successful; proceed with generating tokens
             logger.debug("OTP verification successful")
-            access_token = create_access_token(user.id)
-            issued_refresh = issue_refresh_token(user, request=request)
+            session = create_session(
+                user,
+                request=request,
+                authentication_method="password+totp",
+                authentication_strength="mfa",
+            )
+            access_token = create_access_token(user.id, sid=session.id)
+            issued_refresh = issue_refresh_token(user, request=request, auth_session=session)
             logger.debug(f"Refresh token stored in DB for user_id: {user.id}")  
             
             csrf_token = get_token(request)
@@ -450,6 +469,23 @@ class LogoutAPIView(APIView):
         
         return response
 
+
+class LogoutAllAPIView(APIView):
+    def post(self, request):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return Response(
+                {"detail": "Authentication credentials were not provided or are invalid."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        revoke_all_sessions(user, reason="LOGOUT_ALL")
+        logout(request)
+        response = Response({"message": "Signed out of all devices"})
+        logger.info("User signed out of all sessions")
+        return response
+
+
 class ForgotPasswordRequestView(APIView):
     """
     API View for handling password reset requests.
@@ -556,6 +592,7 @@ class ResetPasswordRequestView(APIView):
             # Set the new password and save the user
             user.set_password(password)
             user.save()
+            revoke_all_sessions(user, reason="PASSWORD_RESET")
         
             # Delete the reset token to prevent reuse
             reset_password.delete()
@@ -667,8 +704,14 @@ class Verify2FASetupAPIView(APIView):
                         revoke_refresh_token(old_refresh_token, reason="MFA_SETUP_COMPLETED")
                     
                     # Create new access and refresh tokens
-                    new_access_token = create_access_token(user.id)
-                    issued_refresh = issue_refresh_token(user, request=request)
+                    session = create_session(
+                        user,
+                        request=request,
+                        authentication_method="password+totp",
+                        authentication_strength="mfa",
+                    )
+                    new_access_token = create_access_token(user.id, sid=session.id)
+                    issued_refresh = issue_refresh_token(user, request=request, auth_session=session)
                     
                     # Prepare and send the response with the new tokens
                     response = Response({

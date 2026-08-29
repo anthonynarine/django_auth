@@ -1,12 +1,14 @@
-from rest_framework import status
 from django.http import JsonResponse
 from django.utils.deprecation import MiddlewareMixin
 from django.contrib.auth import get_user_model
 from django.urls import resolve
 import jwt
-from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 import logging
+from rest_framework import exceptions, status
+
+from user.auth_token import decode_access_token_payload
+from user.session_services import validate_access_session
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -78,7 +80,7 @@ class TokenAuthenticationMiddleware(MiddlewareMixin):
         path = request.path_info.lstrip("/")
         
         # Use Django's resolve() function to match URLs by the name instead of hardcoding paths
-        resolved_path_name = resolve(request.path_info).url_name
+        resolved_path_name = resolve(request.path_info).url_name or ""
         # Check if the request path iex exempt from the authentication
         if any(path.startswith(exempt_path.lstrip("/")) for exempt_path in self.EXEMPT_PATHS) or resolved_path_name.startswith('admin:'):
             # Skip the authentication and proceed to the next layer for exempt paths
@@ -104,17 +106,22 @@ class TokenAuthenticationMiddleware(MiddlewareMixin):
                     "JWT access token found",
                     extra={"token_source": token_source, "request_path": request.path_info},
                 )
-                payload = jwt.decode(token, settings.JWT_ACCESS_SECRET, algorithms=["HS256"])
+                payload = decode_access_token_payload(token)
                 user_id = payload.get("user_id")
                 logger.debug("JWT payload decoded for user_id=%s", user_id)
                 # Fetch the user from the database and attatch to the request
                 request.user = User.objects.get(pk=user_id)
+                session = validate_access_session(payload, user=request.user, request=request)
+                if session is not None:
+                    request.auth_session = session
+                if not request.user.is_active:
+                    raise jwt.InvalidTokenError("Inactive user")
                 logger.debug(f"User {user_id} authenticated successfully via JWT.")
             except jwt.ExpiredSignatureError:
                 # Handle expired tokens
                 logger.info("Expired token received.")
                 return JsonResponse({"error": "Token has expired. Please log in again."}, status=status.HTTP_401_UNAUTHORIZED)
-            except (jwt.InvalidTokenError, User.DoesNotExist) as e:
+            except (jwt.InvalidTokenError, User.DoesNotExist, exceptions.AuthenticationFailed) as e:
                 logger.warning(f"Authentication failure: {e}")
                 return JsonResponse({"error": "Invalid token. Please log in again."}, status=status.HTTP_401_UNAUTHORIZED)
         else:
