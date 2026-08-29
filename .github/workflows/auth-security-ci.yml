@@ -12,6 +12,7 @@ jobs:
     name: SQLite auth regression
     runs-on: ubuntu-latest
     env:
+      DATABASE_URL: sqlite:///test.sqlite3
       SECRET_KEY: ci-secret-key
       JWT_ACCESS_SECRET: ci-access-secret
       JWT_REFRESH_SECRET: ci-refresh-secret
@@ -67,6 +68,7 @@ jobs:
           --health-timeout=5s
           --health-retries=5
     env:
+      DATABASE_URL: postgres://auth_test_user:auth_test_password@127.0.0.1:5432/auth_test_db
       SECRET_KEY: ci-secret-key
       JWT_ACCESS_SECRET: ci-access-secret
       JWT_REFRESH_SECRET: ci-refresh-secret
