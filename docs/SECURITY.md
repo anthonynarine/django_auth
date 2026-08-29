@@ -18,6 +18,10 @@ Caveat: throttle counters live in Django's default cache (`LocMemCache` unless o
 
 Removed every log statement that printed a raw password, JWT (access/refresh/temp), OTP code, the `JWT_REFRESH_SECRET` value itself, full cookie dicts, request headers (which can carry a live `Authorization: Bearer <token>`), or a password-reset link (which embeds the reset token). These were all at `DEBUG`/`INFO` level across `user/views.py` and `user/auth_token.py`. If log output is ever centralized, shared, or leaked (Heroku log drains, `debug.log` on disk), none of these values are recoverable from it anymore.
 
+### CLI secret handling
+
+Operational secrets and temporary credentials MUST NOT be passed inline in Heroku or other process CLI arguments. Use environment variables, stdin, or interactive prompts instead of command-line flags or literal arguments that could be captured by process listings or platform logs.
+
 ### CSRF exemption is now an explicit allowlist
 
 `DisableCSRFMiddleware` used to exempt **all** of `/api/*` unconditionally. It's now an explicit list of the specific endpoints that need it. Behavior is unchanged for every endpoint that exists today — this is a defense-in-depth change, not a new restriction — but a future endpoint added to `user/urls.py` no longer inherits CSRF exemption automatically; it has to be added to the allowlist deliberately.

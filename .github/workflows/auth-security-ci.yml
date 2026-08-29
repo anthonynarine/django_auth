@@ -1,0 +1,115 @@
+name: Auth Security CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  sqlite-auth-regression:
+    name: SQLite auth regression
+    runs-on: ubuntu-latest
+    env:
+      SECRET_KEY: ci-secret-key
+      JWT_ACCESS_SECRET: ci-access-secret
+      JWT_REFRESH_SECRET: ci-refresh-secret
+      JWT_TEMP_SECRET: ci-temp-secret
+      REACT_APP_BASE_URL_DEV: http://localhost:3000
+      DEFAULT_FROM_EMAIL: test@example.com
+      EMAIL_HOST_USER: test@example.com
+      EMAIL_HOST_PASSWORD: test-password
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run SQLite auth regression suite
+        run: |
+          python manage.py test \
+            user.test_a0_auth_contract \
+            user.test_a1_refresh_lifecycle \
+            user.test_a2_sessions \
+            user.test_security_patches \
+            user.test_middleware \
+            --settings=authentication.test_settings \
+            -v 1
+
+      - name: Django checks
+        run: |
+          python manage.py check --settings=authentication.test_settings
+
+  postgres-auth-security:
+    name: PostgreSQL auth security
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: auth_test_db
+          POSTGRES_USER: auth_test_user
+          POSTGRES_PASSWORD: auth_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U auth_test_user -d auth_test_db"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    env:
+      SECRET_KEY: ci-secret-key
+      JWT_ACCESS_SECRET: ci-access-secret
+      JWT_REFRESH_SECRET: ci-refresh-secret
+      JWT_TEMP_SECRET: ci-temp-secret
+      REACT_APP_BASE_URL_DEV: http://localhost:3000
+      DEFAULT_FROM_EMAIL: test@example.com
+      EMAIL_HOST_USER: test@example.com
+      EMAIL_HOST_PASSWORD: test-password
+      POSTGRES_TEST_DB_NAME: auth_test_db
+      POSTGRES_TEST_DB_USER: auth_test_user
+      POSTGRES_TEST_DB_PASSWORD: auth_test_password
+      POSTGRES_TEST_DB_HOST: 127.0.0.1
+      POSTGRES_TEST_DB_PORT: 5432
+      POSTGRES_TEST_DATABASE_NAME: test_auth_test_db
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run PostgreSQL auth/security suite
+        run: |
+          python manage.py test \
+            user.test_a0_auth_contract \
+            user.test_a1_refresh_lifecycle \
+            user.test_a2_sessions \
+            user.test_security_patches \
+            user.test_middleware \
+            --settings=authentication.postgres_test_settings \
+            -v 1
+
+      - name: Django checks
+        run: |
+          python manage.py check --settings=authentication.postgres_test_settings
+
+      - name: Migration dry run
+        run: |
+          python manage.py makemigrations --check --dry-run --settings=authentication.postgres_test_settings

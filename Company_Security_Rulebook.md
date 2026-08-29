@@ -1180,6 +1180,8 @@ staging tests
 rollback strategy
 ```
 
+Operational secrets and temporary credentials MUST NOT be passed inline in Heroku or other process CLI arguments.
+
 New behavioral enforcement SHOULD be observed in staging/production before blocking legitimate users.
 
 ---
