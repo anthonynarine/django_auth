@@ -2,6 +2,7 @@ import json
 import pika
 import logging
 from decouple import config
+from django.conf import settings
 
 # Initialize the logger
 logger = logging.getLogger(__name__)
@@ -22,6 +23,10 @@ def send_user_registered_message(user_data):
             raise ValueError("User data must include 'id', 'email', 'first_name', and 'last_name'.")
 
         cloudamqp_url = config("CLOUDAMQP_URL", default="").strip()
+        if getattr(settings, "TESTING", False):
+            logger.info("TESTING is enabled; skipping RabbitMQ publish.")
+            return
+
         if not cloudamqp_url:
             logger.info("CLOUDAMQP_URL is not configured; skipping RabbitMQ publish.")
             return
