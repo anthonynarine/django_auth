@@ -7,6 +7,7 @@ Tests for the security hardening patches:
   all of /api/.
 """
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
@@ -206,3 +207,24 @@ class RefreshTokenTransportTest(TestCase):
         # AuthenticationFailed to 403 (no WWW-Authenticate header to justify
         # 401) -- pre-existing behavior, unrelated to this fix.
         self.assertEqual(response.status_code, 403)
+
+
+class RabbitMqPublishFallbackTest(TestCase):
+    """RabbitMQ publication should not break auth flows when unconfigured."""
+
+    @patch("user.rabbitmq_producer.pika.BlockingConnection")
+    @patch("user.rabbitmq_producer.config", return_value="")
+    def test_missing_cloudamqp_url_skips_publish(self, mock_config, mock_connection):
+        from user.rabbitmq_producer import send_user_registered_message
+
+        send_user_registered_message(
+            {
+                "id": 1,
+                "email": "fallback@example.com",
+                "first_name": "Fallback",
+                "last_name": "User",
+            }
+        )
+
+        mock_config.assert_called_once_with("CLOUDAMQP_URL", default="")
+        mock_connection.assert_not_called()

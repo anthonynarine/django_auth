@@ -14,13 +14,19 @@ def send_user_registered_message(user_data):
         user_data (dict): The user registration data to send as a message.
                         Must include 'id', 'email', 'first_name', and 'last_name'.
     """
+    connection = None
+
     try:
         # Check that the user data contains the required fields
         if not all(key in user_data for key in ("id", "email", "first_name", "last_name")):
             raise ValueError("User data must include 'id', 'email', 'first_name', and 'last_name'.")
-        
+
+        cloudamqp_url = config("CLOUDAMQP_URL", default="").strip()
+        if not cloudamqp_url:
+            logger.info("CLOUDAMQP_URL is not configured; skipping RabbitMQ publish.")
+            return
+
         # Connect to RabbitMQ server
-        cloudamqp_url = config("CLOUDAMQP_URL") # added on in heroku 
         connection_params = pika.URLParameters(cloudamqp_url)
         connection = pika.BlockingConnection(connection_params)
         channel = connection.channel()
