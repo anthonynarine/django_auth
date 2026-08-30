@@ -17,3 +17,4 @@ PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.MD5PasswordHasher",
 ]
 TESTING = True
+TEST_RUNNER = "django.test.runner.DiscoverRunner"
