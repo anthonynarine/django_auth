@@ -63,12 +63,12 @@ MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
-    # 1st custom middleware: Token Authentication
-    "authentication.custom_middleware.token_auth.TokenAuthenticationMiddleware",
     # 2nd custom middleware: Disable CSRF
     "authentication.custom_middleware.disable_csrf.DisableCSRFMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    # 1st custom middleware: Token Authentication
+    "authentication.custom_middleware.token_auth.TokenAuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     # 3rd custom middleware: JWT Refresh
     # "authentication.custom_middleware.jwt_refresh.TokenRefreshMiddleware",
