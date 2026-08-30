@@ -29,6 +29,7 @@ class DisableCSRFMiddleware(MiddlewareMixin):
         '/api/two-factor-login/',
         '/api/token-refresh/',
         '/api/logout/',
+        '/api/logout-all/',
         '/api/forgot-password/',
         '/api/reset-password/',
         '/api/generate-qr/',

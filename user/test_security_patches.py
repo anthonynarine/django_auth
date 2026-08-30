@@ -136,6 +136,11 @@ class DisableCSRFMiddlewareAllowlistTest(TestCase):
         self.middleware.process_request(request)
         self.assertTrue(getattr(request, "_dont_enforce_csrf_checks", False))
 
+    def test_logout_all_endpoint_is_exempt(self):
+        request = self.factory.post("/api/logout-all/")
+        self.middleware.process_request(request)
+        self.assertTrue(getattr(request, "_dont_enforce_csrf_checks", False))
+
     def test_unlisted_future_endpoint_is_not_exempt(self):
         request = self.factory.post("/api/some-new-endpoint-not-yet-added/")
         self.middleware.process_request(request)
