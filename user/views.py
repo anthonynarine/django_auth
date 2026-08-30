@@ -470,7 +470,10 @@ class LogoutAPIView(APIView):
         return response
 
 
+@method_decorator(csrf_exempt, name="dispatch")
 class LogoutAllAPIView(APIView):
+    authentication_classes = [JWTAuthentication]
+
     def post(self, request):
         user = request.user
         if not user or not user.is_authenticated:
