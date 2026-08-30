@@ -9,6 +9,9 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework import exceptions
 
+from security.models import SecurityEvent
+from security.services import record_security_event
+
 from .models import AuthSession, UserToken
 from .security_utils import get_client_ip
 from .session_selectors import get_active_session
@@ -34,7 +37,7 @@ def create_session(
     """Create a server-controlled authenticated session."""
     now = timezone.now()
     client_ip, user_agent = _request_metadata(request)
-    return AuthSession.objects.create(
+    session = AuthSession.objects.create(
         user=user,
         expires_at=_session_expires_at(),
         last_seen_at=now,
@@ -45,6 +48,20 @@ def create_session(
         last_ip=client_ip,
         user_agent=user_agent,
     )
+    record_security_event(
+        SecurityEvent.EventType.SESSION_CREATED,
+        outcome=SecurityEvent.Outcome.SUCCESS,
+        severity=SecurityEvent.Severity.INFO,
+        reason_code=authentication_method.upper(),
+        user=user,
+        auth_session=session,
+        request=request,
+        metadata={
+            "authentication_method": authentication_method,
+            "authentication_strength": authentication_strength,
+        },
+    )
+    return session
 
 
 def touch_session(session: AuthSession, *, request=None, authentication_strength: str | None = None):
@@ -82,6 +99,15 @@ def validate_access_session(payload: dict, *, user=None, request=None):
     enforcement = getattr(settings, "AUTH_SESSION_ENFORCEMENT", "OBSERVE").upper()
     if not sid:
         if enforcement == "ENFORCE":
+            record_security_event(
+                SecurityEvent.EventType.SESSION_ACCESS_DENIED,
+                outcome=SecurityEvent.Outcome.DENIED,
+                severity=SecurityEvent.Severity.WARNING,
+                reason_code="SESSION_REQUIRED",
+                user=user,
+                request=request,
+                metadata={"enforcement": enforcement},
+            )
             raise exceptions.AuthenticationFailed("Session required.", code=401)
         return None
 
@@ -89,14 +115,64 @@ def validate_access_session(payload: dict, *, user=None, request=None):
         cached_session = _get_cached_request_session(request, str(sid))
         if cached_session is not None:
             if user is not None and cached_session.user_id != user.id:
+                record_security_event(
+                    SecurityEvent.EventType.SESSION_ACCESS_DENIED,
+                    outcome=SecurityEvent.Outcome.DENIED,
+                    severity=SecurityEvent.Severity.WARNING,
+                    reason_code="SID_USER_MISMATCH",
+                    user=user,
+                    auth_session=cached_session,
+                    request=request,
+                )
                 raise exceptions.AuthenticationFailed("unauthenticated", code=401)
             return cached_session
 
     session = get_active_session(sid, user_id=payload.get("user_id"))
     if not session:
+        candidate = AuthSession.objects.select_related("user").filter(id=sid).first()
+        if candidate and not candidate.user.is_active:
+            record_security_event(
+                SecurityEvent.EventType.INACTIVE_USER_DENIED,
+                outcome=SecurityEvent.Outcome.DENIED,
+                severity=SecurityEvent.Severity.HIGH,
+                reason_code="USER_INACTIVE",
+                user=candidate.user,
+                auth_session=candidate,
+                request=request,
+            )
+        else:
+            reason_code = "SESSION_NOT_FOUND"
+            event_type = SecurityEvent.EventType.SESSION_ACCESS_DENIED
+            if candidate is not None:
+                if candidate.revoked_at is not None:
+                    reason_code = "SESSION_REVOKED"
+                elif candidate.expires_at <= timezone.now():
+                    reason_code = "SESSION_EXPIRED"
+                elif payload.get("user_id") and candidate.user_id != payload.get("user_id"):
+                    reason_code = "SID_USER_MISMATCH"
+                else:
+                    reason_code = "SESSION_NOT_ACTIVE"
+            record_security_event(
+                event_type,
+                outcome=SecurityEvent.Outcome.DENIED,
+                severity=SecurityEvent.Severity.WARNING,
+                reason_code=reason_code,
+                user=user,
+                auth_session=candidate,
+                request=request,
+            )
         raise exceptions.AuthenticationFailed("unauthenticated", code=401)
 
     if user is not None and session.user_id != user.id:
+        record_security_event(
+            SecurityEvent.EventType.SESSION_ACCESS_DENIED,
+            outcome=SecurityEvent.Outcome.DENIED,
+            severity=SecurityEvent.Severity.WARNING,
+            reason_code="SID_USER_MISMATCH",
+            user=user,
+            auth_session=session,
+            request=request,
+        )
         raise exceptions.AuthenticationFailed("unauthenticated", code=401)
 
     if request is not None:
@@ -127,15 +203,41 @@ def revoke_session(session: AuthSession, *, reason: str) -> int:
         revoked_at=now,
         revocation_reason=reason,
     )
+    record_security_event(
+        SecurityEvent.EventType.SESSION_REVOKED,
+        outcome=SecurityEvent.Outcome.REVOKED,
+        severity=SecurityEvent.Severity.INFO,
+        reason_code=reason,
+        user=session.user,
+        auth_session=session,
+        metadata={"reason": reason},
+    )
+    if reason == "LOGOUT":
+        record_security_event(
+            SecurityEvent.EventType.LOGOUT,
+            outcome=SecurityEvent.Outcome.REVOKED,
+            severity=SecurityEvent.Severity.INFO,
+            reason_code=reason,
+            user=session.user,
+            auth_session=session,
+        )
+    elif reason == "REPLAY_DETECTED":
+        record_security_event(
+            SecurityEvent.EventType.REFRESH_REPLAY_DETECTED,
+            outcome=SecurityEvent.Outcome.REVOKED,
+            severity=SecurityEvent.Severity.HIGH,
+            reason_code=reason,
+            user=session.user,
+            auth_session=session,
+        )
     return updated
 
 
 def revoke_all_sessions(user, *, reason: str) -> int:
     """Revoke every authenticated session for one user."""
     now = timezone.now()
-    session_ids = list(
-        AuthSession.objects.filter(user=user, revoked_at__isnull=True).values_list("id", flat=True)
-    )
+    sessions = list(AuthSession.objects.filter(user=user, revoked_at__isnull=True))
+    session_ids = [session.id for session in sessions]
     if session_ids:
         AuthSession.objects.filter(id__in=session_ids).update(
             revoked_at=now,
@@ -151,6 +253,25 @@ def revoke_all_sessions(user, *, reason: str) -> int:
         revoked_at=now,
         revocation_reason=reason,
     )
+    for session in sessions:
+        record_security_event(
+            SecurityEvent.EventType.SESSION_REVOKED,
+            outcome=SecurityEvent.Outcome.REVOKED,
+            severity=SecurityEvent.Severity.INFO,
+            reason_code=reason,
+            user=user,
+            auth_session=session,
+            metadata={"reason": reason},
+        )
+    if session_ids:
+        record_security_event(
+            SecurityEvent.EventType.LOGOUT_ALL,
+            outcome=SecurityEvent.Outcome.REVOKED,
+            severity=SecurityEvent.Severity.INFO,
+            reason_code=reason,
+            user=user,
+            metadata={"sessions_revoked": len(session_ids)},
+        )
     return len(session_ids)
 
 

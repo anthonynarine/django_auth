@@ -40,6 +40,8 @@ import pyotp
 import qrcode
 
 from authentication.settings import ACCESS_TOKEN_SAMESITE, REFRESH_TOKEN_SAMESITE
+from security.models import SecurityEvent
+from security.services import record_security_event
 
 # Local application/library specific imports
 from .auth_token import JWT_ACCESS_SECRET, create_access_token, JWTAuthentication, create_temporary_2fa_token, decode_temporary_token
@@ -207,6 +209,14 @@ class LoginAPIView(APIView):
         # Check if both email and password are provided.
         if not email or not password:
             logger.info("Login attempt failed: Missing email or password.")
+            record_security_event(
+                SecurityEvent.EventType.LOGIN_FAILURE,
+                outcome=SecurityEvent.Outcome.FAILURE,
+                severity=SecurityEvent.Severity.WARNING,
+                reason_code="MISSING_CREDENTIALS",
+                request=request,
+                metadata={"authentication_method": "password"},
+            )
             return Response({'error': 'Email and password are required'}, status=status.HTTP_400_BAD_REQUEST)
 
         # Authenticate the user using username and password
@@ -214,6 +224,15 @@ class LoginAPIView(APIView):
         if not user:
             # Log and respond if authentication fails
             logger.error("Authentication failed: Invalid email or password.")
+            record_security_event(
+                SecurityEvent.EventType.LOGIN_FAILURE,
+                outcome=SecurityEvent.Outcome.FAILURE,
+                severity=SecurityEvent.Severity.WARNING,
+                reason_code="INVALID_PASSWORD",
+                user=User.objects.filter(email=email).first(),
+                request=request,
+                metadata={"authentication_method": "password"},
+            )
             return Response({"error": "Invalid email or password"}, status=status.HTTP_401_UNAUTHORIZED)
 
         # Log the user in, which establishes the user's session.
@@ -251,6 +270,16 @@ class LoginAPIView(APIView):
             )
             access_token = create_access_token(user.id, sid=session.id)
             issued_refresh = issue_refresh_token(user, request=request, auth_session=session)
+            record_security_event(
+                SecurityEvent.EventType.LOGIN_SUCCESS,
+                outcome=SecurityEvent.Outcome.SUCCESS,
+                severity=SecurityEvent.Severity.INFO,
+                reason_code="PASSWORD_LOGIN",
+                user=user,
+                auth_session=session,
+                request=request,
+                metadata={"authentication_method": "password"},
+            )
             response = Response({
                 "message": "Logged in successfully.",
                 "access_token": access_token,
@@ -296,6 +325,16 @@ class GuestLoginAPIView(APIView):
             access_token = create_access_token(user.id, sid=session.id)
             issued_refresh = issue_refresh_token(user, request=request, auth_session=session)
             logger.info("Guest login issued.")
+            record_security_event(
+                SecurityEvent.EventType.LOGIN_SUCCESS,
+                outcome=SecurityEvent.Outcome.SUCCESS,
+                severity=SecurityEvent.Severity.INFO,
+                reason_code="GUEST_LOGIN",
+                user=user,
+                auth_session=session,
+                request=request,
+                metadata={"authentication_method": "guest"},
+            )
             return Response({
                 "message": "Logged in as guest.",
                 "access_token": access_token,
@@ -324,6 +363,14 @@ class TwoFactorLoginAPIView(APIView):
         # Check if both OTP and temporary token are provided
         if not otp or not temp_token:
             logger.warning("Missing OTP or temporary token")
+            record_security_event(
+                SecurityEvent.EventType.MFA_FAILURE,
+                outcome=SecurityEvent.Outcome.FAILURE,
+                severity=SecurityEvent.Severity.WARNING,
+                reason_code="MISSING_OTP_OR_TEMP_TOKEN",
+                request=request,
+                metadata={"authentication_method": "password+totp"},
+            )
             return Response({"error": "OTP and temporary token are required."}, status=status.HTTP_400_BAD_REQUEST)
         
         try:
@@ -332,6 +379,14 @@ class TwoFactorLoginAPIView(APIView):
             logger.debug(f"Decoded user ID: {user_id}")
         except exceptions.AuthenticationFailed as e:
             logger.warning(f"Token decoding failed: {str(e)}")
+            record_security_event(
+                SecurityEvent.EventType.MFA_FAILURE,
+                outcome=SecurityEvent.Outcome.FAILURE,
+                severity=SecurityEvent.Severity.WARNING,
+                reason_code="INVALID_TEMP_TOKEN",
+                request=request,
+                metadata={"authentication_method": "password+totp"},
+            )
             # Return an error response if the token is invalid or has expired
             return Response({"error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
         
@@ -344,6 +399,15 @@ class TwoFactorLoginAPIView(APIView):
             
         if not user or not user.is_2fa_enabled:
             logger.warning("2FA not enabled for this user")
+            record_security_event(
+                SecurityEvent.EventType.MFA_FAILURE,
+                outcome=SecurityEvent.Outcome.FAILURE,
+                severity=SecurityEvent.Severity.WARNING,
+                reason_code="TWO_FACTOR_NOT_ENABLED",
+                user=user,
+                request=request,
+                metadata={"authentication_method": "password+totp"},
+            )
             return Response({"error": "Authentication failed. User not found or 2FA not set up."}, status=status.HTTP_401_UNAUTHORIZED)
                 
         # Verify OTP using the user's 2FA secret
@@ -360,6 +424,26 @@ class TwoFactorLoginAPIView(APIView):
             access_token = create_access_token(user.id, sid=session.id)
             issued_refresh = issue_refresh_token(user, request=request, auth_session=session)
             logger.debug(f"Refresh token stored in DB for user_id: {user.id}")  
+            record_security_event(
+                SecurityEvent.EventType.MFA_SUCCESS,
+                outcome=SecurityEvent.Outcome.SUCCESS,
+                severity=SecurityEvent.Severity.INFO,
+                reason_code="OTP_VERIFIED",
+                user=user,
+                auth_session=session,
+                request=request,
+                metadata={"authentication_method": "password+totp"},
+            )
+            record_security_event(
+                SecurityEvent.EventType.LOGIN_SUCCESS,
+                outcome=SecurityEvent.Outcome.SUCCESS,
+                severity=SecurityEvent.Severity.INFO,
+                reason_code="MFA_LOGIN",
+                user=user,
+                auth_session=session,
+                request=request,
+                metadata={"authentication_method": "password+totp"},
+            )
             
             csrf_token = get_token(request)
             
@@ -374,6 +458,15 @@ class TwoFactorLoginAPIView(APIView):
             return response
         else:
             logger.warning("Invalid OTP")
+            record_security_event(
+                SecurityEvent.EventType.MFA_FAILURE,
+                outcome=SecurityEvent.Outcome.FAILURE,
+                severity=SecurityEvent.Severity.WARNING,
+                reason_code="INVALID_OTP",
+                user=user,
+                request=request,
+                metadata={"authentication_method": "password+totp"},
+            )
             raise exceptions.AuthenticationFailed("Authentication failed.")
 
 class GenerateQRCodeAPIView(APIView):
@@ -543,6 +636,15 @@ class ForgotPasswordRequestView(APIView):
             message.attach_alternative(html_content, "text/html")
             message.send()
             logger.info(f"Password reset email sent to {email}")
+            record_security_event(
+                SecurityEvent.EventType.PASSWORD_RESET_REQUESTED,
+                outcome=SecurityEvent.Outcome.SUCCESS,
+                severity=SecurityEvent.Severity.INFO,
+                reason_code="EMAIL_SENT",
+                user=user,
+                request=request,
+                metadata={"request_recorded": True},
+            )
         except Exception as e:
             # Log any failures with sending the email.
             logger.error(f"Failed to send password reset email: {e}")
@@ -595,10 +697,19 @@ class ResetPasswordRequestView(APIView):
             # Set the new password and save the user
             user.set_password(password)
             user.save()
-            revoke_all_sessions(user, reason="PASSWORD_RESET")
+            revoked_sessions = revoke_all_sessions(user, reason="PASSWORD_RESET")
         
             # Delete the reset token to prevent reuse
             reset_password.delete()
+            record_security_event(
+                SecurityEvent.EventType.PASSWORD_RESET_COMPLETED,
+                outcome=SecurityEvent.Outcome.SUCCESS,
+                severity=SecurityEvent.Severity.INFO,
+                reason_code="PASSWORD_RESET",
+                user=user,
+                request=request,
+                metadata={"sessions_revoked": revoked_sessions},
+            )
         
         return Response({
             "message": "Password updated"
@@ -691,6 +802,15 @@ class Verify2FASetupAPIView(APIView):
         # If it's not set, it means the 2FA setup was not initialized properly, and the verification cannot proceed.
         if not user.tfa_secret or not user.is_2fa_setup_in_progress:
             logger.error(f"Attempt to verify OTP without proper 2FA setup by user: {user.username}")
+            record_security_event(
+                SecurityEvent.EventType.MFA_FAILURE,
+                outcome=SecurityEvent.Outcome.FAILURE,
+                severity=SecurityEvent.Severity.WARNING,
+                reason_code="TWO_FACTOR_SETUP_NOT_READY",
+                user=user,
+                request=request,
+                metadata={"authentication_method": "password+totp"},
+            )
             return Response({"error": {"tfa_setup": "2FA is not set up."}}, status=status.HTTP_400_BAD_REQUEST)
         
         totp = pyotp.TOTP(user.tfa_secret)
@@ -715,6 +835,16 @@ class Verify2FASetupAPIView(APIView):
                     )
                     new_access_token = create_access_token(user.id, sid=session.id)
                     issued_refresh = issue_refresh_token(user, request=request, auth_session=session)
+                    record_security_event(
+                        SecurityEvent.EventType.MFA_SUCCESS,
+                        outcome=SecurityEvent.Outcome.SUCCESS,
+                        severity=SecurityEvent.Severity.INFO,
+                        reason_code="OTP_VERIFIED",
+                        user=user,
+                        auth_session=session,
+                        request=request,
+                        metadata={"authentication_method": "password+totp"},
+                    )
                     
                     # Prepare and send the response with the new tokens
                     response = Response({
@@ -731,6 +861,15 @@ class Verify2FASetupAPIView(APIView):
                     return response
                 else:
                     logger.warning(f"Invalid OTP attempt for user: {user.username}")
+                    record_security_event(
+                        SecurityEvent.EventType.MFA_FAILURE,
+                        outcome=SecurityEvent.Outcome.FAILURE,
+                        severity=SecurityEvent.Severity.WARNING,
+                        reason_code="INVALID_OTP",
+                        user=user,
+                        request=request,
+                        metadata={"authentication_method": "password+totp"},
+                    )
                     return Response({"error": {"otp": "Invalid OTP. Please try again"}}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             logger.error(f"Error during 2FA verification for user: {user.username}. Exception: {str(e)}")

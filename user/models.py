@@ -131,6 +131,7 @@ class AuthSession(models.Model):
     user_agent = models.TextField(blank=True, default="")
 
     class Meta:
+        ordering = ["-created_at", "-id"]
         indexes = [
             models.Index(fields=["user", "revoked_at"], name="user_authses_user_revoked_idx"),
             models.Index(fields=["expires_at"], name="user_authses_expires_idx"),

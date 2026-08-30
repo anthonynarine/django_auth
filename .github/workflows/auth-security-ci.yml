@@ -43,12 +43,17 @@ jobs:
             user.test_a2_sessions \
             user.test_security_patches \
             user.test_middleware \
+            security.test_security_events \
             --settings=authentication.test_settings \
             -v 1
 
       - name: Django checks
         run: |
           python manage.py check --settings=authentication.test_settings
+
+      - name: Migration dry run
+        run: |
+          python manage.py makemigrations --check --dry-run --settings=authentication.test_settings
 
   postgres-auth-security:
     name: PostgreSQL auth security
@@ -105,6 +110,7 @@ jobs:
             user.test_a2_sessions \
             user.test_security_patches \
             user.test_middleware \
+            security.test_security_events \
             --settings=authentication.postgres_test_settings \
             -v 1
 

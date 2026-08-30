@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'corsheaders',
     
     # Your apps
+    "security",
     "user",
     "mail"
 ]

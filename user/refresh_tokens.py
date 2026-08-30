@@ -18,6 +18,8 @@ from rest_framework import exceptions
 
 from .auth_token import JWT_REFRESH_SECRET, create_access_token, create_refresh_token
 from .models import UserToken
+from security.models import SecurityEvent
+from security.services import record_security_event
 from .session_selectors import get_active_session
 from .session_services import create_session, get_session_or_create_for_refresh, revoke_session, touch_session
 from .security_utils import get_client_ip
@@ -224,6 +226,7 @@ def rotate_refresh_token(token: str, *, request=None) -> RotatedRefreshToken:
         raise InvalidRefreshToken("Invalid token.")
 
     replay_detected = False
+    replay_event_needs_recording = True
     issued = None
     with transaction.atomic():
         record = _lookup_refresh_record(payload, token)
@@ -235,6 +238,7 @@ def rotate_refresh_token(token: str, *, request=None) -> RotatedRefreshToken:
                 )
                 if session:
                     revoke_session(session, reason="REPLAY_DETECTED")
+                    replay_event_needs_recording = False
                 elif record.family_id:
                     revoke_refresh_family(record.family_id, reason="REPLAY_DETECTED")
             elif record.family_id:
@@ -282,9 +286,33 @@ def rotate_refresh_token(token: str, *, request=None) -> RotatedRefreshToken:
             )
 
     if replay_detected:
+        if replay_event_needs_recording:
+            record_security_event(
+                SecurityEvent.EventType.REFRESH_REPLAY_DETECTED,
+                outcome=SecurityEvent.Outcome.REVOKED,
+                severity=SecurityEvent.Severity.HIGH,
+                reason_code="REFRESH_REPLAY",
+                user=record.user,
+                auth_session=record.auth_session,
+                request=request,
+                metadata={"family_id": str(record.family_id) if record.family_id else None},
+            )
         raise RefreshReplayDetected("unauthenticated")
 
     access_token = create_access_token(record.user_id, sid=issued.record.auth_session_id)
+    record_security_event(
+        SecurityEvent.EventType.TOKEN_REFRESHED,
+        outcome=SecurityEvent.Outcome.SUCCESS,
+        severity=SecurityEvent.Severity.INFO,
+        reason_code="ROTATED",
+        user=record.user,
+        auth_session=issued.record.auth_session,
+        request=request,
+        metadata={
+            "family_id": str(issued.record.family_id) if issued.record.family_id else None,
+            "new_jti": str(issued.record.jti) if issued.record.jti else None,
+        },
+    )
     return RotatedRefreshToken(
         access_token=access_token,
         refresh_token=issued.token,
@@ -319,6 +347,16 @@ def refresh_without_rotation(token: str, *, request=None) -> RotatedRefreshToken
         record.save(update_fields=["last_used_ip", "last_used_at"])
 
     access_token = create_access_token(record.user_id, sid=record.auth_session_id)
+    record_security_event(
+        SecurityEvent.EventType.TOKEN_REFRESHED,
+        outcome=SecurityEvent.Outcome.SUCCESS,
+        severity=SecurityEvent.Severity.INFO,
+        reason_code="ROLLBACK",
+        user=record.user,
+        auth_session=record.auth_session,
+        request=request,
+        metadata={"family_id": str(record.family_id) if record.family_id else None},
+    )
     return RotatedRefreshToken(
         access_token=access_token,
         refresh_token=token,
