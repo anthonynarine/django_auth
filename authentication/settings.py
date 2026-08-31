@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'corsheaders',
     
     # Your apps
+    "abuse",
     "security",
     "user",
     "mail"
@@ -186,6 +187,99 @@ RECENT_AUTH_MAX_AGE_SECONDS = config(
     default=600,
     cast=int,
 )
+
+ABUSE_CONTROL_ENFORCEMENT = config("ABUSE_CONTROL_ENFORCEMENT", default="ENFORCE").upper()
+
+
+def abuse_policy(*, window_seconds: int, throttle_threshold: int, block_threshold: int, block_seconds: int):
+    return {
+        "window_seconds": window_seconds,
+        "throttle_threshold": throttle_threshold,
+        "block_threshold": block_threshold,
+        "block_seconds": block_seconds,
+    }
+
+
+ABUSE_CONTROL_POLICIES = {
+    "LOGIN_IP": abuse_policy(
+        window_seconds=config("ABUSE_LOGIN_IP_WINDOW_SECONDS", default=60, cast=int),
+        throttle_threshold=config("ABUSE_LOGIN_IP_THROTTLE_THRESHOLD", default=5, cast=int),
+        block_threshold=config("ABUSE_LOGIN_IP_BLOCK_THRESHOLD", default=10, cast=int),
+        block_seconds=config("ABUSE_LOGIN_IP_BLOCK_SECONDS", default=900, cast=int),
+    ),
+    "LOGIN_ACCOUNT": abuse_policy(
+        window_seconds=config("ABUSE_LOGIN_ACCOUNT_WINDOW_SECONDS", default=60, cast=int),
+        throttle_threshold=config("ABUSE_LOGIN_ACCOUNT_THROTTLE_THRESHOLD", default=5, cast=int),
+        block_threshold=config("ABUSE_LOGIN_ACCOUNT_BLOCK_THRESHOLD", default=10, cast=int),
+        block_seconds=config("ABUSE_LOGIN_ACCOUNT_BLOCK_SECONDS", default=900, cast=int),
+    ),
+    "LOGIN_IP_ACCOUNT": abuse_policy(
+        window_seconds=config("ABUSE_LOGIN_IP_ACCOUNT_WINDOW_SECONDS", default=60, cast=int),
+        throttle_threshold=config("ABUSE_LOGIN_IP_ACCOUNT_THROTTLE_THRESHOLD", default=5, cast=int),
+        block_threshold=config("ABUSE_LOGIN_IP_ACCOUNT_BLOCK_THRESHOLD", default=10, cast=int),
+        block_seconds=config("ABUSE_LOGIN_IP_ACCOUNT_BLOCK_SECONDS", default=900, cast=int),
+    ),
+    "OTP_SESSION": abuse_policy(
+        window_seconds=config("ABUSE_OTP_SESSION_WINDOW_SECONDS", default=300, cast=int),
+        throttle_threshold=config("ABUSE_OTP_SESSION_THROTTLE_THRESHOLD", default=5, cast=int),
+        block_threshold=config("ABUSE_OTP_SESSION_BLOCK_THRESHOLD", default=10, cast=int),
+        block_seconds=config("ABUSE_OTP_SESSION_BLOCK_SECONDS", default=900, cast=int),
+    ),
+    "OTP_ACCOUNT": abuse_policy(
+        window_seconds=config("ABUSE_OTP_ACCOUNT_WINDOW_SECONDS", default=300, cast=int),
+        throttle_threshold=config("ABUSE_OTP_ACCOUNT_THROTTLE_THRESHOLD", default=5, cast=int),
+        block_threshold=config("ABUSE_OTP_ACCOUNT_BLOCK_THRESHOLD", default=10, cast=int),
+        block_seconds=config("ABUSE_OTP_ACCOUNT_BLOCK_SECONDS", default=900, cast=int),
+    ),
+    "OTP_IP": abuse_policy(
+        window_seconds=config("ABUSE_OTP_IP_WINDOW_SECONDS", default=300, cast=int),
+        throttle_threshold=config("ABUSE_OTP_IP_THROTTLE_THRESHOLD", default=5, cast=int),
+        block_threshold=config("ABUSE_OTP_IP_BLOCK_THRESHOLD", default=10, cast=int),
+        block_seconds=config("ABUSE_OTP_IP_BLOCK_SECONDS", default=900, cast=int),
+    ),
+    "PASSWORD_RESET_IP": abuse_policy(
+        window_seconds=config("ABUSE_PASSWORD_RESET_IP_WINDOW_SECONDS", default=300, cast=int),
+        throttle_threshold=config("ABUSE_PASSWORD_RESET_IP_THROTTLE_THRESHOLD", default=5, cast=int),
+        block_threshold=config("ABUSE_PASSWORD_RESET_IP_BLOCK_THRESHOLD", default=10, cast=int),
+        block_seconds=config("ABUSE_PASSWORD_RESET_IP_BLOCK_SECONDS", default=900, cast=int),
+    ),
+    "PASSWORD_RESET_ACCOUNT": abuse_policy(
+        window_seconds=config("ABUSE_PASSWORD_RESET_ACCOUNT_WINDOW_SECONDS", default=300, cast=int),
+        throttle_threshold=config("ABUSE_PASSWORD_RESET_ACCOUNT_THROTTLE_THRESHOLD", default=5, cast=int),
+        block_threshold=config("ABUSE_PASSWORD_RESET_ACCOUNT_BLOCK_THRESHOLD", default=10, cast=int),
+        block_seconds=config("ABUSE_PASSWORD_RESET_ACCOUNT_BLOCK_SECONDS", default=900, cast=int),
+    ),
+    "REAUTH_SESSION": abuse_policy(
+        window_seconds=config("ABUSE_REAUTH_SESSION_WINDOW_SECONDS", default=300, cast=int),
+        throttle_threshold=config("ABUSE_REAUTH_SESSION_THROTTLE_THRESHOLD", default=5, cast=int),
+        block_threshold=config("ABUSE_REAUTH_SESSION_BLOCK_THRESHOLD", default=10, cast=int),
+        block_seconds=config("ABUSE_REAUTH_SESSION_BLOCK_SECONDS", default=900, cast=int),
+    ),
+    "REAUTH_ACCOUNT": abuse_policy(
+        window_seconds=config("ABUSE_REAUTH_ACCOUNT_WINDOW_SECONDS", default=300, cast=int),
+        throttle_threshold=config("ABUSE_REAUTH_ACCOUNT_THROTTLE_THRESHOLD", default=5, cast=int),
+        block_threshold=config("ABUSE_REAUTH_ACCOUNT_BLOCK_THRESHOLD", default=10, cast=int),
+        block_seconds=config("ABUSE_REAUTH_ACCOUNT_BLOCK_SECONDS", default=900, cast=int),
+    ),
+    "PASSWORD_CHANGE_SESSION": abuse_policy(
+        window_seconds=config("ABUSE_PASSWORD_CHANGE_SESSION_WINDOW_SECONDS", default=300, cast=int),
+        throttle_threshold=config("ABUSE_PASSWORD_CHANGE_SESSION_THROTTLE_THRESHOLD", default=5, cast=int),
+        block_threshold=config("ABUSE_PASSWORD_CHANGE_SESSION_BLOCK_THRESHOLD", default=10, cast=int),
+        block_seconds=config("ABUSE_PASSWORD_CHANGE_SESSION_BLOCK_SECONDS", default=900, cast=int),
+    ),
+    "PASSWORD_CHANGE_ACCOUNT": abuse_policy(
+        window_seconds=config("ABUSE_PASSWORD_CHANGE_ACCOUNT_WINDOW_SECONDS", default=300, cast=int),
+        throttle_threshold=config("ABUSE_PASSWORD_CHANGE_ACCOUNT_THROTTLE_THRESHOLD", default=5, cast=int),
+        block_threshold=config("ABUSE_PASSWORD_CHANGE_ACCOUNT_BLOCK_THRESHOLD", default=10, cast=int),
+        block_seconds=config("ABUSE_PASSWORD_CHANGE_ACCOUNT_BLOCK_SECONDS", default=900, cast=int),
+    ),
+    "MFA_CHANGE_SESSION": abuse_policy(
+        window_seconds=config("ABUSE_MFA_CHANGE_SESSION_WINDOW_SECONDS", default=300, cast=int),
+        throttle_threshold=config("ABUSE_MFA_CHANGE_SESSION_THROTTLE_THRESHOLD", default=5, cast=int),
+        block_threshold=config("ABUSE_MFA_CHANGE_SESSION_BLOCK_THRESHOLD", default=10, cast=int),
+        block_seconds=config("ABUSE_MFA_CHANGE_SESSION_BLOCK_SECONDS", default=900, cast=int),
+    ),
+}
 
 if AUTH_SESSION_ENFORCEMENT not in {"OFF", "OBSERVE", "ENFORCE"}:
     print("AUTH_SESSION_ENFORCEMENT must be OFF, OBSERVE, or ENFORCE.")

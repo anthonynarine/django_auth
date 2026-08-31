@@ -33,6 +33,8 @@ def _default_outcome(event_type: str) -> str:
         SecurityEvent.EventType.MFA_FAILURE: SecurityEvent.Outcome.FAILURE,
         SecurityEvent.EventType.MFA_CHANGE_DENIED: SecurityEvent.Outcome.DENIED,
         SecurityEvent.EventType.PASSWORD_CHANGE_FAILURE: SecurityEvent.Outcome.FAILURE,
+        SecurityEvent.EventType.PASSWORD_CHANGE_THROTTLED: SecurityEvent.Outcome.DENIED,
+        SecurityEvent.EventType.PASSWORD_CHANGE_BLOCKED: SecurityEvent.Outcome.DENIED,
         SecurityEvent.EventType.REAUTH_FAILURE: SecurityEvent.Outcome.FAILURE,
         SecurityEvent.EventType.SESSION_ACCESS_DENIED: SecurityEvent.Outcome.DENIED,
         SecurityEvent.EventType.INACTIVE_USER_DENIED: SecurityEvent.Outcome.DENIED,
@@ -42,6 +44,16 @@ def _default_outcome(event_type: str) -> str:
         SecurityEvent.EventType.REFRESH_REPLAY_DETECTED: SecurityEvent.Outcome.REVOKED,
         SecurityEvent.EventType.MFA_DISABLED: SecurityEvent.Outcome.REVOKED,
         SecurityEvent.EventType.ACCOUNT_DISABLED: SecurityEvent.Outcome.REVOKED,
+        SecurityEvent.EventType.LOGIN_THROTTLED: SecurityEvent.Outcome.DENIED,
+        SecurityEvent.EventType.LOGIN_BLOCKED: SecurityEvent.Outcome.DENIED,
+        SecurityEvent.EventType.OTP_THROTTLED: SecurityEvent.Outcome.DENIED,
+        SecurityEvent.EventType.OTP_BLOCKED: SecurityEvent.Outcome.DENIED,
+        SecurityEvent.EventType.PASSWORD_RESET_THROTTLED: SecurityEvent.Outcome.DENIED,
+        SecurityEvent.EventType.PASSWORD_RESET_BLOCKED: SecurityEvent.Outcome.DENIED,
+        SecurityEvent.EventType.REAUTH_THROTTLED: SecurityEvent.Outcome.DENIED,
+        SecurityEvent.EventType.REAUTH_BLOCKED: SecurityEvent.Outcome.DENIED,
+        SecurityEvent.EventType.MFA_CHANGE_THROTTLED: SecurityEvent.Outcome.DENIED,
+        SecurityEvent.EventType.MFA_CHANGE_BLOCKED: SecurityEvent.Outcome.DENIED,
     }
     return mapping.get(event_type, SecurityEvent.Outcome.SUCCESS)
 
@@ -61,6 +73,8 @@ def _default_severity(event_type: str) -> str:
         SecurityEvent.EventType.MFA_FAILURE: SecurityEvent.Severity.WARNING,
         SecurityEvent.EventType.MFA_CHANGE_DENIED: SecurityEvent.Severity.WARNING,
         SecurityEvent.EventType.PASSWORD_CHANGE_FAILURE: SecurityEvent.Severity.WARNING,
+        SecurityEvent.EventType.PASSWORD_CHANGE_THROTTLED: SecurityEvent.Severity.WARNING,
+        SecurityEvent.EventType.PASSWORD_CHANGE_BLOCKED: SecurityEvent.Severity.HIGH,
         SecurityEvent.EventType.REAUTH_FAILURE: SecurityEvent.Severity.WARNING,
         SecurityEvent.EventType.SESSION_ACCESS_DENIED: SecurityEvent.Severity.WARNING,
         SecurityEvent.EventType.INACTIVE_USER_DENIED: SecurityEvent.Severity.HIGH,
@@ -70,6 +84,16 @@ def _default_severity(event_type: str) -> str:
         SecurityEvent.EventType.REFRESH_REPLAY_DETECTED: SecurityEvent.Severity.HIGH,
         SecurityEvent.EventType.MFA_DISABLED: SecurityEvent.Severity.HIGH,
         SecurityEvent.EventType.ACCOUNT_DISABLED: SecurityEvent.Severity.HIGH,
+        SecurityEvent.EventType.LOGIN_THROTTLED: SecurityEvent.Severity.WARNING,
+        SecurityEvent.EventType.LOGIN_BLOCKED: SecurityEvent.Severity.HIGH,
+        SecurityEvent.EventType.OTP_THROTTLED: SecurityEvent.Severity.WARNING,
+        SecurityEvent.EventType.OTP_BLOCKED: SecurityEvent.Severity.HIGH,
+        SecurityEvent.EventType.PASSWORD_RESET_THROTTLED: SecurityEvent.Severity.WARNING,
+        SecurityEvent.EventType.PASSWORD_RESET_BLOCKED: SecurityEvent.Severity.HIGH,
+        SecurityEvent.EventType.REAUTH_THROTTLED: SecurityEvent.Severity.WARNING,
+        SecurityEvent.EventType.REAUTH_BLOCKED: SecurityEvent.Severity.HIGH,
+        SecurityEvent.EventType.MFA_CHANGE_THROTTLED: SecurityEvent.Severity.WARNING,
+        SecurityEvent.EventType.MFA_CHANGE_BLOCKED: SecurityEvent.Severity.HIGH,
     }
     return mapping.get(event_type, SecurityEvent.Severity.INFO)
 

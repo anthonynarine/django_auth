@@ -12,6 +12,11 @@ from django.utils import timezone
 from rest_framework import exceptions
 from rest_framework.exceptions import ValidationError as DRFValidationError
 
+from abuse.services import (
+    check as abuse_check,
+    record_failure as abuse_record_failure,
+    record_success as abuse_record_success,
+)
 from security.models import SecurityEvent
 from security.services import record_security_event
 
@@ -95,7 +100,17 @@ def reauthenticate_session(
         )
         raise DRFValidationError({"detail": "Active session required."})
 
+    decision = abuse_check("REAUTH_SESSION", request=request, user=user, auth_session=session, account=user.email)
+    if not decision.allowed:
+        raise exceptions.Throttled(wait=decision.retry_after_seconds)
+
+    decision = abuse_check("REAUTH_ACCOUNT", request=request, user=user, account=user.email)
+    if not decision.allowed:
+        raise exceptions.Throttled(wait=decision.retry_after_seconds)
+
     if not user.check_password(current_password):
+        abuse_record_failure("REAUTH_SESSION", request=request, user=user, auth_session=session, account=user.email)
+        abuse_record_failure("REAUTH_ACCOUNT", request=request, user=user, account=user.email)
         record_security_event(
             SecurityEvent.EventType.REAUTH_FAILURE,
             outcome=SecurityEvent.Outcome.FAILURE,
@@ -109,6 +124,8 @@ def reauthenticate_session(
 
     if user.is_2fa_enabled:
         if not otp:
+            abuse_record_failure("REAUTH_SESSION", request=request, user=user, auth_session=session, account=user.email)
+            abuse_record_failure("REAUTH_ACCOUNT", request=request, user=user, account=user.email)
             record_security_event(
                 SecurityEvent.EventType.REAUTH_FAILURE,
                 outcome=SecurityEvent.Outcome.FAILURE,
@@ -120,6 +137,8 @@ def reauthenticate_session(
             )
             raise DRFValidationError({"otp": "OTP is required."})
         if not pyotp.TOTP(user.tfa_secret).verify(otp, valid_window=1):
+            abuse_record_failure("REAUTH_SESSION", request=request, user=user, auth_session=session, account=user.email)
+            abuse_record_failure("REAUTH_ACCOUNT", request=request, user=user, account=user.email)
             record_security_event(
                 SecurityEvent.EventType.REAUTH_FAILURE,
                 outcome=SecurityEvent.Outcome.FAILURE,
@@ -137,6 +156,7 @@ def reauthenticate_session(
         authentication_method = "password"
 
     touch_session(session, request=request, authentication_strength=strength)
+    abuse_record_success(["REAUTH_SESSION", "REAUTH_ACCOUNT"], request=request, user=user, auth_session=session, account=user.email)
     record_security_event(
         SecurityEvent.EventType.REAUTH_SUCCESS,
         outcome=SecurityEvent.Outcome.SUCCESS,
@@ -158,6 +178,14 @@ def change_password(
     new_password: str,
     request=None,
 ):
+    decision = abuse_check("PASSWORD_CHANGE_SESSION", request=request, user=user, auth_session=session, account=user.email)
+    if not decision.allowed:
+        raise exceptions.Throttled(wait=decision.retry_after_seconds)
+
+    decision = abuse_check("PASSWORD_CHANGE_ACCOUNT", request=request, user=user, account=user.email)
+    if not decision.allowed:
+        raise exceptions.Throttled(wait=decision.retry_after_seconds)
+
     require_recent_auth(
         session,
         request=request,
@@ -167,6 +195,8 @@ def change_password(
     )
 
     if not user.check_password(current_password):
+        abuse_record_failure("PASSWORD_CHANGE_SESSION", request=request, user=user, auth_session=session, account=user.email)
+        abuse_record_failure("PASSWORD_CHANGE_ACCOUNT", request=request, user=user, account=user.email)
         record_security_event(
             SecurityEvent.EventType.PASSWORD_CHANGE_FAILURE,
             outcome=SecurityEvent.Outcome.FAILURE,
@@ -181,6 +211,8 @@ def change_password(
     try:
         validate_password(new_password, user=user)
     except ValidationError as exc:
+        abuse_record_failure("PASSWORD_CHANGE_SESSION", request=request, user=user, auth_session=session, account=user.email)
+        abuse_record_failure("PASSWORD_CHANGE_ACCOUNT", request=request, user=user, account=user.email)
         record_security_event(
             SecurityEvent.EventType.PASSWORD_CHANGE_FAILURE,
             outcome=SecurityEvent.Outcome.FAILURE,
@@ -197,6 +229,7 @@ def change_password(
     user.save(update_fields=["password"])
     revoked_count = revoke_other_sessions(user, keep_session=session, reason="PASSWORD_CHANGE")
     touch_session(session, request=request, authentication_strength=session.authentication_strength or "password")
+    abuse_record_success(["PASSWORD_CHANGE_SESSION", "PASSWORD_CHANGE_ACCOUNT"], request=request, user=user, auth_session=session, account=user.email)
     record_security_event(
         SecurityEvent.EventType.PASSWORD_CHANGE_SUCCESS,
         outcome=SecurityEvent.Outcome.SUCCESS,
@@ -218,6 +251,10 @@ def disable_mfa(
     otp: str | None = None,
     request=None,
 ):
+    decision = abuse_check("MFA_CHANGE_SESSION", request=request, user=user, auth_session=session, account=user.email)
+    if not decision.allowed:
+        raise exceptions.Throttled(wait=decision.retry_after_seconds)
+
     require_recent_auth(
         session,
         request=request,
@@ -239,6 +276,7 @@ def disable_mfa(
         raise DRFValidationError({"is_2fa_enabled": "MFA is not enabled."})
 
     if not user.check_password(current_password):
+        abuse_record_failure("MFA_CHANGE_SESSION", request=request, user=user, auth_session=session, account=user.email)
         record_security_event(
             SecurityEvent.EventType.MFA_CHANGE_DENIED,
             outcome=SecurityEvent.Outcome.DENIED,
@@ -251,6 +289,7 @@ def disable_mfa(
         raise DRFValidationError({"current_password": "Current password is incorrect."})
 
     if not otp:
+        abuse_record_failure("MFA_CHANGE_SESSION", request=request, user=user, auth_session=session, account=user.email)
         record_security_event(
             SecurityEvent.EventType.MFA_CHANGE_DENIED,
             outcome=SecurityEvent.Outcome.DENIED,
@@ -263,6 +302,7 @@ def disable_mfa(
         raise DRFValidationError({"otp": "OTP is required."})
 
     if not pyotp.TOTP(user.tfa_secret).verify(otp, valid_window=1):
+        abuse_record_failure("MFA_CHANGE_SESSION", request=request, user=user, auth_session=session, account=user.email)
         record_security_event(
             SecurityEvent.EventType.MFA_CHANGE_DENIED,
             outcome=SecurityEvent.Outcome.DENIED,
@@ -280,6 +320,7 @@ def disable_mfa(
     user.save(update_fields=["is_2fa_enabled", "is_2fa_setup_in_progress", "tfa_secret"])
     revoked_count = revoke_other_sessions(user, keep_session=session, reason="MFA_DISABLED")
     touch_session(session, request=request, authentication_strength="password")
+    abuse_record_success("MFA_CHANGE_SESSION", request=request, user=user, auth_session=session, account=user.email)
     record_security_event(
         SecurityEvent.EventType.MFA_DISABLED,
         outcome=SecurityEvent.Outcome.REVOKED,

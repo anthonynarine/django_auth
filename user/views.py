@@ -34,11 +34,11 @@ from django.views.decorators.csrf import csrf_exempt
 
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.throttling import ScopedRateThrottle
 
 import pyotp
 import qrcode
 
+from abuse.services import check as abuse_check, record_failure as abuse_record_failure, record_success as abuse_record_success
 from authentication.settings import ACCESS_TOKEN_SAMESITE, REFRESH_TOKEN_SAMESITE
 from security.models import SecurityEvent
 from security.services import record_security_event
@@ -82,6 +82,60 @@ GREEN = '\033[92m'
 END = '\033[0m'
 
 logger.debug("DEBUG mode is: %s", settings.DEBUG)
+
+
+def _abuse_blocked_response(decision, *, message: str):
+    response = Response({"error": message}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+    if decision.retry_after_seconds:
+        response["Retry-After"] = str(decision.retry_after_seconds)
+    return response
+
+
+def _first_blocked_abuse_decision(calls):
+    for scope, kwargs in calls:
+        decision = abuse_check(scope, **kwargs)
+        if not decision.allowed:
+            return decision
+    return None
+
+
+def _pick_abuse_decision(*decisions):
+    if not decisions:
+        return None
+    ranking = {
+        "NORMAL": 0,
+        "THROTTLED": 1,
+        "BLOCKED": 2,
+    }
+    return max(decisions, key=lambda decision: ranking.get(decision.state, 0))
+
+
+def _login_abuse_call_args(*, request, email: str | None):
+    calls = [("LOGIN_IP", {"request": request})]
+    if email:
+        calls.extend(
+            [
+                ("LOGIN_ACCOUNT", {"request": request, "account": email}),
+                ("LOGIN_IP_ACCOUNT", {"request": request, "account": email}),
+            ]
+        )
+    return calls
+
+
+def _otp_abuse_call_args(*, request, user=None, session=None):
+    calls = [("OTP_IP", {"request": request})]
+    if user is not None:
+        calls.append(("OTP_ACCOUNT", {"request": request, "user": user, "account": user.email}))
+    if session is not None:
+        calls.append(("OTP_SESSION", {"request": request, "user": user, "auth_session": session, "account": user.email}))
+    return calls
+
+
+def _password_reset_abuse_call_args(*, request, email: str | None):
+    calls = [("PASSWORD_RESET_IP", {"request": request})]
+    if email:
+        calls.append(("PASSWORD_RESET_ACCOUNT", {"request": request, "account": email}))
+    return calls
 
 
 @method_decorator(csrf_exempt, name='dispatch')
@@ -186,8 +240,6 @@ class LoginAPIView(APIView):
     """
 
     permission_classes = [AllowAny]  # Allow access to any user regardless of their authentication status.
-    throttle_scope = "login"
-
     def post(self, request):
         print("LoginAPIView: Request reached")
         """
@@ -213,8 +265,14 @@ class LoginAPIView(APIView):
         email = data.get("email", "").strip().lower()  # Normalize email to ensure case-insensitive comparison.
         password = data.get("password")
 
+        blocked = _first_blocked_abuse_decision(_login_abuse_call_args(request=request, email=email or None))
+        if blocked:
+            return _abuse_blocked_response(blocked, message="Login temporarily blocked.")
+
         # Check if both email and password are provided.
         if not email or not password:
+            for scope, kwargs in _login_abuse_call_args(request=request, email=email or None):
+                abuse_record_failure(scope, **kwargs)
             logger.info("Login attempt failed: Missing email or password.")
             record_security_event(
                 SecurityEvent.EventType.LOGIN_FAILURE,
@@ -229,6 +287,8 @@ class LoginAPIView(APIView):
         # Authenticate the user using username and password
         user = authenticate(username=email, password=password)
         if not user:
+            for scope, kwargs in _login_abuse_call_args(request=request, email=email or None):
+                abuse_record_failure(scope, **kwargs)
             # Log and respond if authentication fails
             logger.error("Authentication failed: Invalid email or password.")
             record_security_event(
@@ -244,6 +304,8 @@ class LoginAPIView(APIView):
 
         # Log the user in, which establishes the user's session.
         login(request, user)
+        for scope, kwargs in _login_abuse_call_args(request=request, email=email or None):
+            abuse_record_success(scope, **kwargs)
 
         # Check if the 2FA setup was incomplete and reset if necessary
         if user.is_2fa_setup_in_progress:
@@ -313,9 +375,11 @@ class GuestLoginAPIView(APIView):
     """
 
     permission_classes = [AllowAny]
-    throttle_scope = "login"
-
     def post(self, request):
+        blocked = _first_blocked_abuse_decision([("LOGIN_IP", {"request": request})])
+        if blocked:
+            return _abuse_blocked_response(blocked, message="Guest login temporarily blocked.")
+
         try:
             user = User.objects.get(email=DEMO_USER_EMAIL)
         except User.DoesNotExist:
@@ -332,6 +396,7 @@ class GuestLoginAPIView(APIView):
             access_token = create_access_token(user.id, sid=session.id)
             issued_refresh = issue_refresh_token(user, request=request, auth_session=session)
             logger.info("Guest login issued.")
+            abuse_record_success("LOGIN_IP", request=request, user=user, auth_session=session, account=user.email)
             record_security_event(
                 SecurityEvent.EventType.LOGIN_SUCCESS,
                 outcome=SecurityEvent.Outcome.SUCCESS,
@@ -356,8 +421,6 @@ class TwoFactorLoginAPIView(APIView):
     Handles the verification of the second factor for users with 2FA enabled.
     """
 
-    throttle_scope = "otp_verify"
-
     def post(self, request):
         """
         Processes a 2FA verification request. Validates the OTP provided by the user against the user's tfa_secret.
@@ -366,9 +429,13 @@ class TwoFactorLoginAPIView(APIView):
         data = request.data
         otp = data.get("otp")  # Extract the OTP from the request data
         temp_token = request.COOKIES.get("temp_token")  # Get the temporary token from cookies
+        blocked = _first_blocked_abuse_decision([("OTP_IP", {"request": request})])
+        if blocked:
+            return _abuse_blocked_response(blocked, message="OTP verification temporarily blocked.")
 
         # Check if both OTP and temporary token are provided
         if not otp or not temp_token:
+            abuse_record_failure("OTP_IP", request=request)
             logger.warning("Missing OTP or temporary token")
             record_security_event(
                 SecurityEvent.EventType.MFA_FAILURE,
@@ -385,6 +452,7 @@ class TwoFactorLoginAPIView(APIView):
             user_id = decode_temporary_token(temp_token)
             logger.debug(f"Decoded user ID: {user_id}")
         except exceptions.AuthenticationFailed as e:
+            abuse_record_failure("OTP_IP", request=request)
             logger.warning(f"Token decoding failed: {str(e)}")
             record_security_event(
                 SecurityEvent.EventType.MFA_FAILURE,
@@ -405,6 +473,7 @@ class TwoFactorLoginAPIView(APIView):
             return Response({"error": "Authentication failed. User not found or 2FA not set up."}, status=status.HTTP_401_UNAUTHORIZED)
             
         if not user or not user.is_2fa_enabled:
+            abuse_record_failure("OTP_IP", request=request, user=user, account=getattr(user, "email", None))
             logger.warning("2FA not enabled for this user")
             record_security_event(
                 SecurityEvent.EventType.MFA_FAILURE,
@@ -419,6 +488,10 @@ class TwoFactorLoginAPIView(APIView):
                 
         # Verify OTP using the user's 2FA secret
         totp = pyotp.TOTP(user.tfa_secret)
+        otp_calls = _otp_abuse_call_args(request=request, user=user)
+        blocked = _first_blocked_abuse_decision(otp_calls)
+        if blocked:
+            return _abuse_blocked_response(blocked, message="OTP verification temporarily blocked.")
         if totp.verify(otp):
             # OTP verification successful; proceed with generating tokens
             logger.debug("OTP verification successful")
@@ -451,6 +524,8 @@ class TwoFactorLoginAPIView(APIView):
                 request=request,
                 metadata={"authentication_method": "password+totp"},
             )
+            for scope, kwargs in otp_calls:
+                abuse_record_success(scope, **kwargs)
             
             csrf_token = get_token(request)
             
@@ -464,6 +539,8 @@ class TwoFactorLoginAPIView(APIView):
             response.set_cookie("csrftoken", csrf_token, httponly=False, secure=True, samesite='Strict')
             return response
         else:
+            for scope, kwargs in otp_calls:
+                abuse_record_failure(scope, **kwargs)
             logger.warning("Invalid OTP")
             record_security_event(
                 SecurityEvent.EventType.MFA_FAILURE,
@@ -691,8 +768,6 @@ class ForgotPasswordRequestView(APIView):
     Allows any user (authenticated or not) to request a password reset link.
     """
     permission_classes = [AllowAny]
-    throttle_scope = "password_reset"
-
     def post(self, request):
         """
         Handles POST requests to send password reset emails.
@@ -711,9 +786,16 @@ class ForgotPasswordRequestView(APIView):
             # Return an error response if the email field is missing.
             return Response({"error": "Email field is required"}, status=status.HTTP_400_BAD_REQUEST)
 
+        normalized_email = email.strip().lower()
+        blocked = _first_blocked_abuse_decision(_password_reset_abuse_call_args(request=request, email=normalized_email))
+        if blocked:
+            return _abuse_blocked_response(blocked, message="Password reset temporarily blocked.")
+
         try:
-            user = User.objects.get(email=email)
+            user = User.objects.get(email=normalized_email)
         except ObjectDoesNotExist:
+            abuse_record_failure("PASSWORD_RESET_IP", request=request, account=normalized_email)
+            abuse_record_failure("PASSWORD_RESET_ACCOUNT", request=request, account=normalized_email)
             # Do not reveal whether the email address exists to protect user privacy.
             return Response({"message": "If the email is registered with us, you will receive a password reset link shortly."},
                             status=status.HTTP_200_OK)
@@ -739,6 +821,7 @@ class ForgotPasswordRequestView(APIView):
             message.attach_alternative(html_content, "text/html")
             message.send()
             logger.info(f"Password reset email sent to {email}")
+            abuse_record_success(["PASSWORD_RESET_IP", "PASSWORD_RESET_ACCOUNT"], request=request, user=user, account=normalized_email)
             record_security_event(
                 SecurityEvent.EventType.PASSWORD_RESET_REQUESTED,
                 outcome=SecurityEvent.Outcome.SUCCESS,
@@ -770,6 +853,10 @@ class ResetPasswordRequestView(APIView):
             return Response({
                 "error": "Password, Password confirmation, and token are required"
             }, status=status.HTTP_400_BAD_REQUEST)
+
+        blocked = _first_blocked_abuse_decision([("PASSWORD_RESET_IP", {"request": request})])
+        if blocked:
+            return _abuse_blocked_response(blocked, message="Password reset temporarily blocked.")
         
         # Check if passwords match
         if password != password_confirm:
@@ -787,11 +874,16 @@ class ResetPasswordRequestView(APIView):
             logger.info("ResetPasswordRequestView: Attempting to retrieve reset record.")
             reset_password = get_object_or_404(Reset, token=token)
             user = get_object_or_404(User, email=reset_password.email)
+            blocked = _first_blocked_abuse_decision(_password_reset_abuse_call_args(request=request, email=user.email))
+            if blocked:
+                return _abuse_blocked_response(blocked, message="Password reset temporarily blocked.")
 
             # check_token() verifies the token is both authentic and still
             # within PASSWORD_RESET_TIMEOUT. Without this, a reset link never
             # expires on its own -- the Reset row only ever goes away once used.
             if not PasswordResetTokenGenerator().check_token(user, token):
+                abuse_record_failure("PASSWORD_RESET_IP", request=request, account=user.email)
+                abuse_record_failure("PASSWORD_RESET_ACCOUNT", request=request, user=user, account=user.email)
                 return Response(
                     {"error": "This password reset link is invalid or has expired."},
                     status=status.HTTP_400_BAD_REQUEST,
@@ -801,6 +893,7 @@ class ResetPasswordRequestView(APIView):
             user.set_password(password)
             user.save()
             revoked_sessions = revoke_all_sessions(user, reason="PASSWORD_RESET")
+            abuse_record_success(["PASSWORD_RESET_IP", "PASSWORD_RESET_ACCOUNT"], request=request, user=user, account=user.email)
         
             # Delete the reset token to prevent reuse
             reset_password.delete()
@@ -886,12 +979,11 @@ class Toggle2FAAPIView(APIView):
 class Verify2FASetupAPIView(APIView):
     """Verifies the OTP provided by the user during the initial 2FA setup process."""
 
-    throttle_scope = "otp_verify"
-
     def post(self, request, *args, **kwargs):
         user = request.user
         session = resolve_current_auth_session(request)
         otp_provided = request.data.get("otp")
+        otp_calls = _otp_abuse_call_args(request=request, user=user, session=session)
 
         require_recent_auth(
             session,
@@ -901,8 +993,14 @@ class Verify2FASetupAPIView(APIView):
             failure_event=SecurityEvent.EventType.MFA_CHANGE_DENIED,
         )
 
+        blocked = _first_blocked_abuse_decision(otp_calls)
+        if blocked:
+            return _abuse_blocked_response(blocked, message="OTP verification temporarily blocked.")
+
         if not user.tfa_secret or not user.is_2fa_setup_in_progress:
             logger.error(f"Attempt to verify OTP without proper 2FA setup by user: {user.username}")
+            for scope, kwargs in otp_calls:
+                abuse_record_failure(scope, **kwargs)
             record_security_event(
                 SecurityEvent.EventType.MFA_FAILURE,
                 outcome=SecurityEvent.Outcome.FAILURE,
@@ -955,6 +1053,8 @@ class Verify2FASetupAPIView(APIView):
                         request=request,
                         metadata={"authentication_method": "password+totp"},
                     )
+                    for scope, kwargs in otp_calls:
+                        abuse_record_success(scope, **kwargs)
 
                     response = Response({
                         "message": "2FA setup complete, new tokens issued",
@@ -969,6 +1069,8 @@ class Verify2FASetupAPIView(APIView):
                     return response
                 else:
                     logger.warning(f"Invalid OTP attempt for user: {user.username}")
+                    for scope, kwargs in otp_calls:
+                        abuse_record_failure(scope, **kwargs)
                     record_security_event(
                         SecurityEvent.EventType.MFA_FAILURE,
                         outcome=SecurityEvent.Outcome.FAILURE,
