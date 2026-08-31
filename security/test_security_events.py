@@ -274,6 +274,23 @@ class SecurityReadAccessTest(TestCase):
         self.assertIn("successful_logins", summary_response.json())
         self.assertIn("results", sessions_response.json())
 
+        event = events_response.json()["results"][0]
+        session = sessions_response.json()["results"][0]
+
+        self.assertEqual(event["user_email"], self.staff.email)
+        self.assertEqual(event["event_label"], "Login success")
+        self.assertEqual(event["outcome_label"], "Success")
+        self.assertEqual(event["severity_label"], "Info")
+        self.assertEqual(event["reason_label"], "Password Login")
+        self.assertEqual(event["session_user_email"], self.staff.email)
+        self.assertIn(self.staff.email, event["session_display_name"])
+
+        self.assertEqual(session["user_email"], self.staff.email)
+        self.assertEqual(session["user_display_name"], self.staff.email)
+        self.assertEqual(session["status_code"], "ACTIVE")
+        self.assertEqual(session["status"], "Active")
+        self.assertIn(self.staff.email, session["session_display_name"])
+
     def test_non_staff_is_denied(self):
         non_staff = User.objects.create_user(
             email="audit-user@example.com",

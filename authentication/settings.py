@@ -181,6 +181,11 @@ AUTH_SESSION_LIFETIME_DAYS = config(
     default=7,
     cast=int,
 )
+RECENT_AUTH_MAX_AGE_SECONDS = config(
+    "RECENT_AUTH_MAX_AGE_SECONDS",
+    default=600,
+    cast=int,
+)
 
 if AUTH_SESSION_ENFORCEMENT not in {"OFF", "OBSERVE", "ENFORCE"}:
     print("AUTH_SESSION_ENFORCEMENT must be OFF, OBSERVE, or ENFORCE.")

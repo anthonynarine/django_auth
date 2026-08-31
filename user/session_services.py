@@ -293,3 +293,41 @@ def get_session_or_create_for_refresh(record: UserToken, *, request=None):
     record.auth_session = session
     record.save(update_fields=["auth_session"])
     return session
+
+
+def revoke_other_sessions(user, *, keep_session: AuthSession | None = None, reason: str) -> int:
+    """Revoke every active session for a user except the session being retained."""
+    now = timezone.now()
+    keep_session_id = getattr(keep_session, "id", None)
+    sessions = list(
+        AuthSession.objects.filter(user=user, revoked_at__isnull=True)
+        .exclude(id=keep_session_id)
+    )
+    session_ids = [session.id for session in sessions]
+    if session_ids:
+        AuthSession.objects.filter(id__in=session_ids).update(
+            revoked_at=now,
+            revocation_reason=reason,
+            last_seen_at=now,
+        )
+
+    user_tokens = UserToken.objects.filter(user=user, revoked_at__isnull=True)
+    if keep_session_id is not None:
+        user_tokens = user_tokens.exclude(auth_session_id=keep_session_id)
+    user_tokens.update(
+        is_revoked=True,
+        revoked_at=now,
+        revocation_reason=reason,
+    )
+
+    for session in sessions:
+        record_security_event(
+            SecurityEvent.EventType.SESSION_REVOKED,
+            outcome=SecurityEvent.Outcome.REVOKED,
+            severity=SecurityEvent.Severity.INFO,
+            reason_code=reason,
+            user=user,
+            auth_session=session,
+            metadata={"reason": reason},
+        )
+    return len(session_ids)

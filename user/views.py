@@ -6,7 +6,7 @@ import os
 
 # Third-party imports
 from django.contrib.auth.password_validation import validate_password
-from django.contrib.auth import get_user_model, authenticate, login, logout
+from django.contrib.auth import get_user_model, authenticate, login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.validators import validate_email
@@ -51,7 +51,14 @@ from .refresh_tokens import (
     revoke_refresh_token,
     rotate_refresh_token,
 )
-from .session_services import create_session, revoke_all_sessions
+from .session_services import create_session, revoke_all_sessions, revoke_other_sessions
+from .account_security_services import (
+    change_password as perform_password_change,
+    disable_mfa as perform_mfa_disable,
+    reauthenticate_session,
+    require_recent_auth,
+    resolve_current_auth_session,
+)
 from .serializers import CustomUserSerializer
 from .guest import DEMO_USER_EMAIL
 from .rabbitmq_producer import send_user_registered_message
@@ -471,29 +478,124 @@ class TwoFactorLoginAPIView(APIView):
 
 class GenerateQRCodeAPIView(APIView):
     """
-    Generate a QR code for setting up 2FA with an authenticator app
+    Generate a QR code for setting up 2FA with an authenticator app.
     """
-    @method_decorator(login_required)
+
     def get(self, request, *args, **kwargs):
         user = request.user
+        session = resolve_current_auth_session(request)
+        require_recent_auth(
+            session,
+            request=request,
+            user=user,
+            operation="MFA_ENABLE",
+            failure_event=SecurityEvent.EventType.MFA_CHANGE_DENIED,
+        )
+
         if not user.tfa_secret:
             user.tfa_secret = pyotp.random_base32()
             user.save(update_fields=["tfa_secret"])
 
-        # Construct the providing URI
         issuer_name = "Gait"
-        totp_uri = pyotp.totp.TOTP(user.tfa_secret).provisioning_uri(user.email, issuer_name=issuer_name)
+        totp_uri = pyotp.totp.TOTP(user.tfa_secret).provisioning_uri(
+            user.email,
+            issuer_name=issuer_name,
+        )
 
-        # Generate QR code
         qr_img = qrcode.make(totp_uri)
-        
-        # Save QR code to a buffer
         buf = BytesIO()
         qr_img.save(buf, format="PNG")
         buf.seek(0)
-        
-        return HttpResponse(buf.getvalue(), content_type="image/png") 
-    
+
+        return HttpResponse(buf.getvalue(), content_type="image/png")
+
+
+class ChangePasswordAPIView(APIView):
+    """Change the authenticated user's password using the current password."""
+
+    def post(self, request):
+        user = request.user
+        session = resolve_current_auth_session(request)
+        current_password = request.data.get("current_password")
+        new_password = request.data.get("new_password")
+        new_password_confirm = request.data.get("new_password_confirm")
+
+        if not current_password or not new_password or new_password_confirm is None:
+            return Response(
+                {"error": "current_password, new_password, and new_password_confirm are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if new_password_confirm is not None and new_password != new_password_confirm:
+            return Response(
+                {"error": {"new_password_confirm": "Passwords do not match"}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            revoked_count = perform_password_change(
+                user=user,
+                session=session,
+                current_password=current_password,
+                new_password=new_password,
+                request=request,
+            )
+        except exceptions.PermissionDenied:
+            raise
+        except exceptions.ValidationError as exc:
+            return Response(
+                {"error": exc.detail},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        update_session_auth_hash(request, user)
+        return Response(
+            {
+                "message": "Password changed successfully.",
+                "sessions_revoked": revoked_count,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class ReauthenticateAPIView(APIView):
+    """Refresh recent-auth state without creating a new session."""
+
+    def post(self, request):
+        user = request.user
+        session = resolve_current_auth_session(request)
+        current_password = request.data.get("current_password")
+        otp = request.data.get("otp")
+
+        if not current_password:
+            return Response(
+                {"error": "current_password is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            session = reauthenticate_session(
+                user=user,
+                session=session,
+                current_password=current_password,
+                otp=otp,
+                request=request,
+            )
+        except exceptions.ValidationError as exc:
+            return Response(
+                {"error": exc.detail},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(
+            {
+                "message": "Reauthenticated successfully.",
+                "recent_auth_at": session.recent_auth_at,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
 class ValidateSessionAPIView(APIView):
     authentication_classes = [JWTAuthentication]
 
@@ -717,90 +819,88 @@ class ResetPasswordRequestView(APIView):
         }, status=status.HTTP_202_ACCEPTED)
 
 class Toggle2FAAPIView(APIView):
-    """
-    Handles the PATCH request to toggle the "is_2fa_enabled" field of the user.
+    """Toggle 2FA setup or disablement with explicit security checks."""
 
-    This view is responsible for initiating or disabling the two-factor authentication (2FA) setup process.
-    When 2FA is enabled, it sets the "is_2fa_setup_in_progress" field to True to indicate that the setup process
-    is ongoing. When 2FA is disabled, it resets the "is_2fa_enabled", "is_2fa_setup_in_progress", and "tfa_secret"
-    fields to ensure that 2FA is fully disabled.
-
-    Expects:
-        request.data: Dictionary containing "is_2fa_enabled" key with a boolean value indicating whether 2FA should be enabled or disabled.
-
-    Returns:
-        Response object with the new state of "is_2fa_enabled" and "is_2fa_setup_in_progress", or an error message.
-    """
     def patch(self, request):
         logger.debug("Toggle2FAAPIView: Received request")
         user = request.user
+        session = resolve_current_auth_session(request)
         logger.debug(f"Request user: {user}")
-        
-        # check ensures that only authenticated users can toggle the 2FA status.
-        if not user.is_authenticated:
-            logger.error("Authentication failed: User is not authenticated")
-            return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
-        
+
         is_2fa_enabled = request.data.get("is_2fa_enabled")
         if is_2fa_enabled is None:
             logger.error("Missing 'is_2fa_enabled' parameter in request")
             return Response({"error": "Missing 'is_2fa_enabled' parameter. Please specify if two-factor authentication should be enabled or disabled."}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # when is_2fa_enabled is True
+
+        if isinstance(is_2fa_enabled, str):
+            is_2fa_enabled = is_2fa_enabled.lower() in {"1", "true", "yes", "on"}
+        else:
+            is_2fa_enabled = bool(is_2fa_enabled)
+
         if is_2fa_enabled:
-            # Start the 2FA setup process
+            if user.is_2fa_enabled and not user.is_2fa_setup_in_progress:
+                record_security_event(
+                    SecurityEvent.EventType.MFA_CHANGE_DENIED,
+                    outcome=SecurityEvent.Outcome.DENIED,
+                    severity=SecurityEvent.Severity.WARNING,
+                    reason_code="MFA_ALREADY_ENABLED",
+                    user=user,
+                    auth_session=session,
+                    request=request,
+                )
+                return Response({"error": "MFA is already enabled."}, status=status.HTTP_400_BAD_REQUEST)
             user.is_2fa_setup_in_progress = True
+            user.save(update_fields=["is_2fa_setup_in_progress"])
             logger.info(f"2FA setup initiated for user {user.username}")
         else:
-            # Disable 2FA and reset related fields if is_2fa_enabeled is False
-            user.is_2fa_enabled = False
-            user.is_2fa_setup_in_progress = False
-            user.tfa_secret = ""
-            logger.info(f"2FA disabled for user {user.username}")
-        
-        # Save the updated fields to the database
-        user.save(update_fields=["is_2fa_enabled", "is_2fa_setup_in_progress", "tfa_secret"])
-        
-        logger.info(f"2FA status toggled successfully for user {user.username}. is_2fa_enabled set to {is_2fa_enabled}, is_2fa_setup_in_progress set to {user.is_2fa_setup_in_progress}.")
-        
+            current_password = request.data.get("current_password")
+            otp = request.data.get("otp")
+            if not current_password:
+                return Response({"error": "current_password is required when disabling MFA."}, status=status.HTTP_400_BAD_REQUEST)
+            try:
+                revoked_count = perform_mfa_disable(
+                    user=user,
+                    session=session,
+                    current_password=current_password,
+                    otp=otp,
+                    request=request,
+                )
+            except exceptions.ValidationError as exc:
+                return Response({"error": exc.detail}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {
+                    "is_2fa_setup_in_progress": user.is_2fa_setup_in_progress,
+                    "sessions_revoked": revoked_count,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        logger.info(
+            f"2FA status toggled successfully for user {user.username}. is_2fa_enabled set to {is_2fa_enabled}, is_2fa_setup_in_progress set to {user.is_2fa_setup_in_progress}."
+        )
+
         return Response({
             "is_2fa_setup_in_progress": user.is_2fa_setup_in_progress
         }, status=status.HTTP_200_OK)
 
 class Verify2FASetupAPIView(APIView):
-    """
-    Verifies the OTP provided by the user during the initial 2FA setup process.
-    
-    This view handles the verification of the one-time password (OTP) during the two-factor authentication (2FA) setup process.
-    If the OTP is correct, it finalizes the 2FA setup by enabling 2FA for the user and generates new access, refresh, and CSRF tokens.
-    If the OTP is incorrect or the 2FA setup was not initialized properly, it returns an error message.
-    
-    Methods:
-        post(request, *args, **kwargs): Verifies the OTP and completes the 2FA setup process if the OTP is correct.
-    """
+    """Verifies the OTP provided by the user during the initial 2FA setup process."""
 
     throttle_scope = "otp_verify"
 
-    @method_decorator(login_required)
     def post(self, request, *args, **kwargs):
-        """
-        Handles the POST request to verify the OTP during the 2FA setup process.
-        
-        Parameters:
-            request (HttpRequest): The HTTP request object containing the OTP in the request data.
-            
-        Returns:
-            Response: A Django REST framework response object with either the success message and new tokens
-                    if the OTP is correct, or an error message if the OTP is incorrect or the setup was not initialized. 
-        """
-        # Retrieve the current user
         user = request.user
-        
-        # Extract the OTP from the request data. This OTP is expected to be provided by the user after scanning their 2FA setup QR code.
+        session = resolve_current_auth_session(request)
         otp_provided = request.data.get("otp")
 
-        # Check if the 2FA secret key is set for the user. This key is necessary to verify the OTP.
-        # If it's not set, it means the 2FA setup was not initialized properly, and the verification cannot proceed.
+        require_recent_auth(
+            session,
+            request=request,
+            user=user,
+            operation="MFA_ENABLE",
+            failure_event=SecurityEvent.EventType.MFA_CHANGE_DENIED,
+        )
+
         if not user.tfa_secret or not user.is_2fa_setup_in_progress:
             logger.error(f"Attempt to verify OTP without proper 2FA setup by user: {user.username}")
             record_security_event(
@@ -809,11 +909,12 @@ class Verify2FASetupAPIView(APIView):
                 severity=SecurityEvent.Severity.WARNING,
                 reason_code="TWO_FACTOR_SETUP_NOT_READY",
                 user=user,
+                auth_session=session,
                 request=request,
                 metadata={"authentication_method": "password+totp"},
             )
             return Response({"error": {"tfa_setup": "2FA is not set up."}}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         totp = pyotp.TOTP(user.tfa_secret)
         try:
             with transaction.atomic():
@@ -821,13 +922,11 @@ class Verify2FASetupAPIView(APIView):
                     user.is_2fa_enabled = True
                     user.is_2fa_setup_in_progress = False
                     user.save(update_fields=["is_2fa_enabled", "is_2fa_setup_in_progress"])
-                    
-                    # Invalidate old refresh token
+
                     old_refresh_token = request.COOKIES.get("refresh_token")
                     if old_refresh_token:
                         revoke_refresh_token(old_refresh_token, reason="MFA_SETUP_COMPLETED")
-                    
-                    # Create new access and refresh tokens
+
                     session = create_session(
                         user,
                         request=request,
@@ -846,18 +945,26 @@ class Verify2FASetupAPIView(APIView):
                         request=request,
                         metadata={"authentication_method": "password+totp"},
                     )
-                    
-                    # Prepare and send the response with the new tokens
+                    record_security_event(
+                        SecurityEvent.EventType.MFA_ENABLED,
+                        outcome=SecurityEvent.Outcome.SUCCESS,
+                        severity=SecurityEvent.Severity.INFO,
+                        reason_code="MFA_ENABLED",
+                        user=user,
+                        auth_session=session,
+                        request=request,
+                        metadata={"authentication_method": "password+totp"},
+                    )
+
                     response = Response({
                         "message": "2FA setup complete, new tokens issued",
                         "access_token": new_access_token,
                         "refresh_token": issued_refresh.token
                     }, status=status.HTTP_200_OK)
-                    
-                    # Set CSRF token (this is good security practice)
+
                     csrf_token = get_token(request)
-                    response.set_cookie("csrftoken", csrf_token, httponly=False, secure=True, samesite="Strict")                              
-                                        
+                    response.set_cookie("csrftoken", csrf_token, httponly=False, secure=True, samesite="Strict")
+
                     logger.info(f"2FA setup completed successfully for user: {user.username}")
                     return response
                 else:
@@ -868,6 +975,7 @@ class Verify2FASetupAPIView(APIView):
                         severity=SecurityEvent.Severity.WARNING,
                         reason_code="INVALID_OTP",
                         user=user,
+                        auth_session=session,
                         request=request,
                         metadata={"authentication_method": "password+totp"},
                     )

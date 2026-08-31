@@ -94,3 +94,10 @@ def safe_user_agent(request) -> str:
     user_agent = request.META.get("HTTP_USER_AGENT", "") if hasattr(request, "META") else ""
     return _truncate_text(user_agent, 2048)
 
+
+def humanize_code(value: str) -> str:
+    """Convert an enum/code string into a human-readable label."""
+    if not value:
+        return ""
+    return str(value).replace("_", " ").strip().title()
+

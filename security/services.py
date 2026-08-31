@@ -22,18 +22,26 @@ def _default_outcome(event_type: str) -> str:
     mapping = {
         SecurityEvent.EventType.LOGIN_SUCCESS: SecurityEvent.Outcome.SUCCESS,
         SecurityEvent.EventType.MFA_SUCCESS: SecurityEvent.Outcome.SUCCESS,
+        SecurityEvent.EventType.MFA_ENABLED: SecurityEvent.Outcome.SUCCESS,
         SecurityEvent.EventType.SESSION_CREATED: SecurityEvent.Outcome.SUCCESS,
         SecurityEvent.EventType.TOKEN_REFRESHED: SecurityEvent.Outcome.SUCCESS,
+        SecurityEvent.EventType.PASSWORD_CHANGE_SUCCESS: SecurityEvent.Outcome.SUCCESS,
+        SecurityEvent.EventType.REAUTH_SUCCESS: SecurityEvent.Outcome.SUCCESS,
         SecurityEvent.EventType.PASSWORD_RESET_REQUESTED: SecurityEvent.Outcome.SUCCESS,
         SecurityEvent.EventType.PASSWORD_RESET_COMPLETED: SecurityEvent.Outcome.SUCCESS,
         SecurityEvent.EventType.LOGIN_FAILURE: SecurityEvent.Outcome.FAILURE,
         SecurityEvent.EventType.MFA_FAILURE: SecurityEvent.Outcome.FAILURE,
+        SecurityEvent.EventType.MFA_CHANGE_DENIED: SecurityEvent.Outcome.DENIED,
+        SecurityEvent.EventType.PASSWORD_CHANGE_FAILURE: SecurityEvent.Outcome.FAILURE,
+        SecurityEvent.EventType.REAUTH_FAILURE: SecurityEvent.Outcome.FAILURE,
         SecurityEvent.EventType.SESSION_ACCESS_DENIED: SecurityEvent.Outcome.DENIED,
         SecurityEvent.EventType.INACTIVE_USER_DENIED: SecurityEvent.Outcome.DENIED,
         SecurityEvent.EventType.SESSION_REVOKED: SecurityEvent.Outcome.REVOKED,
         SecurityEvent.EventType.LOGOUT: SecurityEvent.Outcome.REVOKED,
         SecurityEvent.EventType.LOGOUT_ALL: SecurityEvent.Outcome.REVOKED,
         SecurityEvent.EventType.REFRESH_REPLAY_DETECTED: SecurityEvent.Outcome.REVOKED,
+        SecurityEvent.EventType.MFA_DISABLED: SecurityEvent.Outcome.REVOKED,
+        SecurityEvent.EventType.ACCOUNT_DISABLED: SecurityEvent.Outcome.REVOKED,
     }
     return mapping.get(event_type, SecurityEvent.Outcome.SUCCESS)
 
@@ -42,18 +50,26 @@ def _default_severity(event_type: str) -> str:
     mapping = {
         SecurityEvent.EventType.LOGIN_SUCCESS: SecurityEvent.Severity.INFO,
         SecurityEvent.EventType.MFA_SUCCESS: SecurityEvent.Severity.INFO,
+        SecurityEvent.EventType.MFA_ENABLED: SecurityEvent.Severity.INFO,
         SecurityEvent.EventType.SESSION_CREATED: SecurityEvent.Severity.INFO,
         SecurityEvent.EventType.TOKEN_REFRESHED: SecurityEvent.Severity.INFO,
+        SecurityEvent.EventType.PASSWORD_CHANGE_SUCCESS: SecurityEvent.Severity.INFO,
+        SecurityEvent.EventType.REAUTH_SUCCESS: SecurityEvent.Severity.INFO,
         SecurityEvent.EventType.PASSWORD_RESET_REQUESTED: SecurityEvent.Severity.INFO,
         SecurityEvent.EventType.PASSWORD_RESET_COMPLETED: SecurityEvent.Severity.INFO,
         SecurityEvent.EventType.LOGIN_FAILURE: SecurityEvent.Severity.WARNING,
         SecurityEvent.EventType.MFA_FAILURE: SecurityEvent.Severity.WARNING,
+        SecurityEvent.EventType.MFA_CHANGE_DENIED: SecurityEvent.Severity.WARNING,
+        SecurityEvent.EventType.PASSWORD_CHANGE_FAILURE: SecurityEvent.Severity.WARNING,
+        SecurityEvent.EventType.REAUTH_FAILURE: SecurityEvent.Severity.WARNING,
         SecurityEvent.EventType.SESSION_ACCESS_DENIED: SecurityEvent.Severity.WARNING,
         SecurityEvent.EventType.INACTIVE_USER_DENIED: SecurityEvent.Severity.HIGH,
         SecurityEvent.EventType.SESSION_REVOKED: SecurityEvent.Severity.INFO,
         SecurityEvent.EventType.LOGOUT: SecurityEvent.Severity.INFO,
         SecurityEvent.EventType.LOGOUT_ALL: SecurityEvent.Severity.INFO,
         SecurityEvent.EventType.REFRESH_REPLAY_DETECTED: SecurityEvent.Severity.HIGH,
+        SecurityEvent.EventType.MFA_DISABLED: SecurityEvent.Severity.HIGH,
+        SecurityEvent.EventType.ACCOUNT_DISABLED: SecurityEvent.Severity.HIGH,
     }
     return mapping.get(event_type, SecurityEvent.Severity.INFO)
 
