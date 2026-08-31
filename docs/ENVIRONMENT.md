@@ -11,6 +11,7 @@ All read via `python-decouple` (`config(...)`) from a local `.env` file, or from
 | `JWT_REFRESH_SECRET` | `settings.py`, `auth_token.py` | Signs/verifies 7-day refresh tokens. **App exits at startup if unset.** |
 | `JWT_TEMP_SECRET` | `auth_token.py` | Signs/verifies the 10-minute 2FA temporary token |
 | `DEFAULT_FROM_EMAIL` | `settings.py` | From-address for outgoing application mail. Required when `DEBUG=False`; defaults locally. |
+| `SERVER_EMAIL` | `settings.py` | From-address for server error mail. Defaults to `DEFAULT_FROM_EMAIL`. |
 | `EMAIL_HOST_USER` | `settings.py` | SMTP username for outgoing application mail. Required when `DEBUG=False`; optional locally. |
 | `EMAIL_HOST_PASSWORD` | `settings.py` | SMTP password or provider app password for outgoing application mail. Required when `DEBUG=False`; optional locally. |
 | `CLOUDAMQP_URL` | `rabbitmq_producer.py` | RabbitMQ connection string for the `user_events` fanout exchange |
@@ -56,3 +57,26 @@ https://gaitobservatory.com
 ```
 
 `https://gait.netlify.app` remains temporarily allowed during the Netlify custom-domain cutover.
+
+## Zoho SMTP
+
+Production mail for `gaitobservatory.com` should use Zoho SMTP through environment variables. Do not commit real SMTP credentials.
+
+```text
+EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+EMAIL_HOST=smtp.zoho.com
+EMAIL_PORT=587
+EMAIL_USE_TLS=True
+EMAIL_HOST_USER=security@gaitobservatory.com
+EMAIL_HOST_PASSWORD=<zoho-app-password>
+DEFAULT_FROM_EMAIL=Gait Security <security@gaitobservatory.com>
+SERVER_EMAIL=security@gaitobservatory.com
+```
+
+If Zoho two-factor authentication is enabled on the mailbox, generate an app password in Zoho Accounts:
+
+```text
+Zoho Accounts -> Security -> App Passwords -> Generate New Password
+```
+
+Name the password for this application, for example `Gait Django SMTP`, and store it only in local environment variables or Heroku config vars.

@@ -197,6 +197,7 @@ if DEBUG:
         "DEFAULT_FROM_EMAIL",
         default="accounts@gaitobservatory.local",
     )
+    SERVER_EMAIL = config("SERVER_EMAIL", default=DEFAULT_FROM_EMAIL)
     EMAIL_BACKEND = config(
         "EMAIL_BACKEND",
         default="django.core.mail.backends.console.EmailBackend",
@@ -205,6 +206,7 @@ if DEBUG:
     EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
 else:
     DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL")
+    SERVER_EMAIL = config("SERVER_EMAIL", default=DEFAULT_FROM_EMAIL)
     EMAIL_BACKEND = config(
         "EMAIL_BACKEND",
         default="django.core.mail.backends.smtp.EmailBackend",
