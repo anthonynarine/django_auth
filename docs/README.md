@@ -7,7 +7,7 @@ This is the maintainer's manual for the `django_auth` service. Where the top-lev
 ```mermaid
 flowchart LR
     subgraph Client["Frontend (different domain)"]
-        FE["React SPA\ngait.netlify.app"]
+        FE["React SPA\ngaitobservatory.com"]
     end
 
     subgraph Backend["django_auth — Heroku"]
@@ -17,16 +17,16 @@ flowchart LR
     end
 
     MQ[["RabbitMQ\nuser_events fanout"]]
-    SG["SendGrid"]
+    SMTP["SMTP email"]
 
     FE -- "Authorization: Bearer &lt;JWT&gt;" --> MW
     MW --> Views
     Views --> DB
     Views -. "on register (best-effort)" .-> MQ
-    Views -. "transactional email (best-effort)" .-> SG
+    Views -. "transactional email (best-effort)" .-> SMTP
 ```
 
-The frontend and this API live on **different registrable domains** (`gait.netlify.app` vs `herokuapp.com`). That single fact drives several design decisions documented here — cookie-based CSRF can't work cleanly across it, tokens are transported via the `Authorization` header rather than relying on ambient cookies, and it's the reason a same-domain reverse proxy is the long-term plan. See [`SECURITY.md`](SECURITY.md) for the full reasoning.
+The frontend and this API live on **different registrable domains** (`gaitobservatory.com` vs `herokuapp.com`). That single fact drives several design decisions documented here — cookie-based CSRF can't work cleanly across it, tokens are transported via the `Authorization` header rather than relying on ambient cookies, and it's the reason a same-domain reverse proxy is the long-term plan. See [`SECURITY.md`](SECURITY.md) for the full reasoning.
 
 ## Manual contents
 

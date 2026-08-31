@@ -130,11 +130,11 @@ Diagnostic endpoint confirming the CSRF-exemption allowlist is wired correctly. 
 
 ### `POST /mail/send-email/`
 
-Generic SendGrid send, decoupled from the `user` app's own transactional emails.
+Generic SMTP email send, decoupled from the `user` app's own transactional emails.
 
 **Body:** `{ "from_email", "to_email", "subject", "content" }`
 **200** → `{ "message": "Email sent successfully" }`
-**500** → SendGrid failure
+**500** → SMTP email failure
 
 ## Serialized user shape
 

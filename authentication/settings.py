@@ -145,6 +145,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3001",
     "http://localhost:5173", 
     "https://ant-django-auth-62cf01255868.herokuapp.com",
+    "https://gaitobservatory.com",
     'https://gait.netlify.app',
     # Additional origins...
     *csv_config("CORS_ALLOWED_ORIGINS_EXTRA"),
@@ -156,6 +157,7 @@ CSRF_TRUSTED_ORIGINS = [
     'http://localhost:3001',
     "http://localhost:5173",
     "https://ant-django-auth-62cf01255868.herokuapp.com",
+    "https://gaitobservatory.com",
     'https://gait.netlify.app',
     # Additional trusted origins...
     *csv_config("CSRF_TRUSTED_ORIGINS_EXTRA"),
@@ -189,16 +191,32 @@ if not JWT_ACCESS_SECRET or not JWT_REFRESH_SECRET:
     sys.exit(1)
 
 
-# Email Settings (Zoho Mail via SMTP)
-DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL")
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+# Email Settings (Zoho Mail via SMTP in production; console email in local dev)
+if DEBUG:
+    DEFAULT_FROM_EMAIL = config(
+        "DEFAULT_FROM_EMAIL",
+        default="accounts@gaitobservatory.local",
+    )
+    EMAIL_BACKEND = config(
+        "EMAIL_BACKEND",
+        default="django.core.mail.backends.console.EmailBackend",
+    )
+    EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="")
+    EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
+else:
+    DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL")
+    EMAIL_BACKEND = config(
+        "EMAIL_BACKEND",
+        default="django.core.mail.backends.smtp.EmailBackend",
+    )
+    EMAIL_HOST_USER = config("EMAIL_HOST_USER")
+    EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD")
+
 EMAIL_HOST = config("EMAIL_HOST", default="smtp.zoho.com")
 EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)
 EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
 # Zoho requires an app-specific password here (not the account login
 # password) when 2FA is enabled on the mailbox.
-EMAIL_HOST_USER = config("EMAIL_HOST_USER")
-EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD")
 
 AUTH_PASSWORD_VALIDATORS = [
     {

@@ -7,7 +7,7 @@ class DisableCSRFMiddleware(MiddlewareMixin):
 
     This is an explicit allowlist rather than a blanket "/api/*" exemption.
     Every endpoint listed here needs it today because the frontend
-    (gait.netlify.app) and this API live on different registrable domains:
+    (gaitobservatory.com) and this API live on different registrable domains:
     a CSRF cookie set by this backend is never visible to the frontend's own
     JS (cross-origin document.cookie reads are blocked by the browser
     regardless of SameSite), so the standard double-submit-cookie CSRF

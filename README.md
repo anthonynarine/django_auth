@@ -9,7 +9,7 @@
 A standalone Django REST authentication service: registration, login, JWT access/refresh tokens, TOTP-based two-factor authentication, and password reset — built to be consumed by other services (like the [Lumen](https://github.com/anthonynarine) platform) as a central identity provider.
 
 **Live API:** `https://ant-django-auth-62cf01255868.herokuapp.com/api`
-**Reference frontend:** [gait.netlify.app](https://gait.netlify.app) ([AuthFlow](https://github.com/anthonynarine/AuthFlow) repo)
+**Reference frontend:** [gaitobservatory.com](https://gaitobservatory.com) ([AuthFlow](https://github.com/anthonynarine/AuthFlow) repo). The legacy Netlify subdomain, `https://gait.netlify.app`, remains temporarily allowed during the domain cutover.
 
 ---
 
@@ -41,7 +41,7 @@ A standalone Django REST authentication service: registration, login, JWT access
 | Auth tokens | PyJWT (HS256), custom-issued — not `django-rest-framework-simplejwt` |
 | 2FA | `pyotp` (TOTP) + `qrcode` for setup |
 | Database | PostgreSQL (via `dj-database-url` / `decouple`) |
-| Email | SendGrid (`django-sendgrid-v5`) |
+| Email | SMTP transactional email |
 | Async events | RabbitMQ (`pika`), CloudAMQP in production |
 | Static files | WhiteNoise |
 | Hosting | Heroku (`django-heroku`, `gunicorn`) |
@@ -72,7 +72,7 @@ The app **hard-exits at startup** if `JWT_ACCESS_SECRET` or `JWT_REFRESH_SECRET`
 ```
 authentication/     Project root: settings, root urls.py, custom middleware
 user/                Auth domain: CustomUser model, JWT issuance, login/2FA/reset views
-mail/                Standalone generic SendGrid-send endpoint
+mail/                Standalone generic SMTP email endpoint
 docs/                Full system manual — architecture, flows, API reference, security notes
 templates/email/     HTML templates for transactional emails
 ```

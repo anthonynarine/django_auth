@@ -28,7 +28,7 @@ flowchart TB
 
 - **`authentication/`** — settings, root `urls.py`, and the two custom middleware classes that run on every request.
 - **`user/`** — the real auth domain: the `CustomUser` model, JWT issuance/validation, and every login/2FA/password-reset view.
-- **`mail/`** — a single generic SendGrid-send endpoint (`/mail/send-email/`), intentionally decoupled from the `user` app's own transactional emails (registration thank-you, password reset).
+- **`mail/`** — a single generic SMTP email endpoint (`/mail/send-email/`), intentionally decoupled from the `user` app's own transactional emails (registration thank-you, password reset).
 
 ## Middleware chain
 

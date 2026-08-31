@@ -10,7 +10,7 @@ sequenceDiagram
     participant FE as React SPA
     participant API as Django API
     participant MQ as RabbitMQ
-    participant SG as SendGrid
+    participant SMTP as SMTP email
 
     U->>FE: Fill registration form
     FE->>API: POST /api/register/ {email, first_name, last_name, password, password_confirm}
@@ -18,11 +18,11 @@ sequenceDiagram
     API->>API: Validate password (Django validators, min 8 chars)
     API->>API: Create CustomUser (password hashed via set_password)
     API-->>MQ: publish to "user_events" fanout exchange (best-effort)
-    API-->>SG: send thank-you email (best-effort)
+    API-->>SMTP: send thank-you email (best-effort)
     API-->>FE: 201 Created + serialized user
 ```
 
-Both the RabbitMQ publish and the SendGrid send are **best-effort** — failures are logged, never raised. Registration succeeds even if either downstream system is unreachable.
+Both the RabbitMQ publish and the SMTP email send are **best-effort** — failures are logged, never raised. Registration succeeds even if either downstream system is unreachable.
 
 ## Login (2FA disabled — the common case)
 
@@ -138,7 +138,7 @@ sequenceDiagram
     participant U as User
     participant FE as React SPA
     participant API as Django API
-    participant SG as SendGrid
+    participant SMTP as SMTP email
 
     U->>FE: Enter email
     FE->>API: POST /api/forgot-password/ {email}

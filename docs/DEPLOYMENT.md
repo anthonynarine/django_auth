@@ -28,4 +28,4 @@ Double-check `DEBUG=False` is set on Heroku — the app's cookie security settin
 ## Known constraints worth remembering before scaling
 
 - **Rate-limit counters are per-process** (`LocMemCache` by default) — see [`SECURITY.md`](SECURITY.md#rate-limiting). If this service ever runs multiple dynos or multiple gunicorn workers, throttling becomes a soft, per-process limit rather than a hard global one. Moving to a shared cache (Redis/Memcached) would be the fix if that becomes a problem.
-- **RabbitMQ (CloudAMQP) and SendGrid calls are synchronous** inside the request/response cycle for `RegisterAPIView` and `ForgotPasswordRequestView` — a slow or unreachable external service adds latency to those endpoints, even though failures don't block the response.
+- **RabbitMQ (CloudAMQP) and SMTP email calls are synchronous** inside the request/response cycle for `RegisterAPIView` and `ForgotPasswordRequestView` — a slow or unreachable external service adds latency to those endpoints, even though failures don't block the response.

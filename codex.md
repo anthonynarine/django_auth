@@ -25,7 +25,7 @@ python manage.py test user.test_middleware
 python manage.py test user.test_middleware.TokenAuthenticationMiddlewareTest
 ```
 
-Required environment variables (see `.env`, not committed): `SECRET_KEY`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `JWT_TEMP_SECRET`, `DEFAULT_FROM_EMAIL`, `SENDGRID_API_KEY`, `CLOUDAMQP_URL`, `POSTGRESQL_DB_*`, `REACT_APP_BASE_URL_DEV`/`_PROD`. The app hard-exits at startup (`authentication/settings.py`) if either JWT secret is missing.
+Required environment variables (see `.env`, not committed): `SECRET_KEY`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `JWT_TEMP_SECRET`, `DEFAULT_FROM_EMAIL`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `CLOUDAMQP_URL`, `POSTGRESQL_DB_*`, `REACT_APP_BASE_URL_DEV`/`_PROD`. The app hard-exits at startup (`authentication/settings.py`) if either JWT secret is missing.
 
 Deployment is Heroku (`Procfile` runs `gunicorn authentication.wsgi`, `django_heroku` wires up Postgres/logging in `settings.py`); locally it falls back to a `DATABASE_URL` or direct Postgres config via `dj_database_url`/`decouple`, not sqlite, despite `db.sqlite3` being present in the repo.
 
@@ -34,7 +34,7 @@ Deployment is Heroku (`Procfile` runs `gunicorn authentication.wsgi`, `django_he
 ### Three-app Django project
 - `authentication/` — project root: settings, root `urls.py`, and custom middleware.
 - `user/` — the actual auth domain: `CustomUser` model, JWT issuance/validation, login/2FA/password-reset views, RabbitMQ event producer.
-- `mail/` — a single generic SendGrid-send endpoint (`/mail/send-email/`), decoupled from the `user` app's own transactional emails.
+- `mail/` — a single generic SMTP email endpoint (`/mail/send-email/`), decoupled from the `user` app's own transactional emails.
 
 ### Dual authentication mechanisms (both active, doing overlapping jobs)
 1. **`TokenAuthenticationMiddleware`** (`authentication/custom_middleware/token_auth.py`) — runs on every request, reads a JWT from the `access_token` cookie (falling back to the `Authorization: Bearer` header), decodes it, and sets `request.user` directly. Paths in its `EXEMPT_PATHS` list skip this entirely. This middleware itself returns 401 JSON responses on invalid/expired tokens — it does not delegate to DRF exception handling.
@@ -57,7 +57,7 @@ Three distinct JWTs, each with its own secret and lifetime:
 `user/roles.py` defines `RoleChoices` (`admin`, `physician`, `technologist`), stored on `CustomUser.role` and embedded directly in access/refresh token payloads — role is available to consumers without a DB round trip.
 
 ### Side effects on registration
-`RegisterAPIView` does two things beyond creating the user: publishes a `user_events` fanout message to RabbitMQ via `user/rabbitmq_producer.py` (uses `CLOUDAMQP_URL`), and sends a SendGrid "thank you" email using the `templates/email/` templates. Both are best-effort — failures are logged, not raised, so registration succeeds even if RabbitMQ/SendGrid fail.
+`RegisterAPIView` does two things beyond creating the user: publishes a `user_events` fanout message to RabbitMQ via `user/rabbitmq_producer.py` (uses `CLOUDAMQP_URL`), and sends a "thank you" email using the `templates/email/` templates. Both are best-effort — failures are logged, not raised, so registration succeeds even if RabbitMQ/SMTP email fail.
 
 ### Password reset
 Stateless-looking but stateful: `ForgotPasswordRequestView` always returns the same generic success message (to avoid email enumeration) but only actually creates a `Reset` record and sends an email if the address exists. `ResetPasswordRequestView` looks up by the reset token (not by user/uid), then deletes the `Reset` row after use — tokens are single-use.
