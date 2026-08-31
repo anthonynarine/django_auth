@@ -26,6 +26,7 @@ class DisableCSRFMiddleware(MiddlewareMixin):
     EXEMPT_PATHS = [
         '/api/register/',
         '/api/login/',
+        '/api/guest-login/',
         '/api/two-factor-login/',
         '/api/token-refresh/',
         '/api/logout/',

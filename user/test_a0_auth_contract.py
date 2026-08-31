@@ -14,6 +14,7 @@ from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
+from authentication.custom_middleware.disable_csrf import DisableCSRFMiddleware
 from user.admin import UserTokenAdmin
 from user.auth_token import (
     JWT_ACCESS_SECRET,
@@ -183,6 +184,14 @@ class PublicProtectedEndpointContractTest(TestCase):
         self.assertEqual(response.status_code, 201)
         send_message.assert_called_once()
         email_message.return_value.send.assert_called_once()
+
+    def test_public_guest_login_endpoint_is_csrf_exempt(self):
+        request = self.client.request().wsgi_request
+        request.path_info = "/api/guest-login/"
+
+        DisableCSRFMiddleware(lambda req: None).process_request(request)
+
+        self.assertTrue(getattr(request, "_dont_enforce_csrf_checks", False))
 
     def test_protected_endpoint_rejects_unauthenticated_request(self):
         response = self.client.get(reverse("fetch_user"))
