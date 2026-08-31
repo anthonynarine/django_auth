@@ -510,8 +510,9 @@ class ValidateSessionAPIView(APIView):
         
         # If the user is authenticated, proceed to serialize and return the user data
         user_data = CustomUserSerializer(request.user).data
+        user_data["is_staff"] = bool(request.user.is_staff)
         logger.debug(f"User data: {user_data}")
-        return Response(CustomUserSerializer(request.user).data)
+        return Response(user_data)
     
 @method_decorator(csrf_exempt, name="dispatch")
 class RefreshAPIView(APIView):

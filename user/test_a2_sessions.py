@@ -55,6 +55,43 @@ class AuthSessionLifecycleTest(TestCase):
         self.assertIsNone(session.revoked_at)
         self.assertEqual(session.id, UserToken.objects.get(user=self.user).auth_session_id)
 
+    def test_validate_session_exposes_is_staff_for_staff_users(self):
+        staff = User.objects.create_user(
+            email="staff-session@example.com",
+            password=self.password,
+            is_staff=True,
+        )
+        login_response = self.client.post(
+            reverse("login"),
+            {"email": staff.email, "password": self.password},
+            content_type="application/json",
+        )
+        access_token = login_response.json()["access_token"]
+
+        response = self.client.get(
+            reverse("fetch_user"),
+            HTTP_AUTHORIZATION=f"Bearer {access_token}",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["is_staff"])
+
+    def test_validate_session_exposes_is_staff_false_for_non_staff_users(self):
+        login_response = self.client.post(
+            reverse("login"),
+            {"email": self.user.email, "password": self.password},
+            content_type="application/json",
+        )
+        access_token = login_response.json()["access_token"]
+
+        response = self.client.get(
+            reverse("fetch_user"),
+            HTTP_AUTHORIZATION=f"Bearer {access_token}",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()["is_staff"])
+
     def test_refresh_preserves_session_identifier_and_migrates_family_state(self):
         login_response = self.client.post(
             reverse("login"),
