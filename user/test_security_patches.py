@@ -86,6 +86,11 @@ class PasswordResetExpiryTest(TestCase):
 
         self.assertEqual(first.status_code, 200)
         self.assertEqual(second.status_code, 200)
+        self.assertEqual(first.json(), second.json())
+        self.assertEqual(
+            first.json()["message"],
+            "If the email is registered with us, you will receive a password reset link shortly.",
+        )
         self.assertEqual(Reset.objects.filter(email=self.user.email).count(), 1)
         self.assertEqual(mock_send.call_count, 2)
 

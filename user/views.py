@@ -774,6 +774,7 @@ class ForgotPasswordRequestView(APIView):
     """
     permission_classes = [AllowAny]
     def post(self, request):
+        reset_message = "If the email is registered with us, you will receive a password reset link shortly."
         """
         Handles POST requests to send password reset emails.
 
@@ -802,8 +803,7 @@ class ForgotPasswordRequestView(APIView):
             abuse_record_failure("PASSWORD_RESET_IP", request=request, account=normalized_email)
             abuse_record_failure("PASSWORD_RESET_ACCOUNT", request=request, account=normalized_email)
             # Do not reveal whether the email address exists to protect user privacy.
-            return Response({"message": "If the email is registered with us, you will receive a password reset link shortly."},
-                            status=status.HTTP_200_OK)
+            return Response({"message": reset_message}, status=status.HTTP_200_OK)
 
         # Generate a secure token for the password reset process.
         token = PasswordResetTokenGenerator().make_token(user)
@@ -845,7 +845,7 @@ class ForgotPasswordRequestView(APIView):
             return Response({"error": "Failed to send password reset email"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         # Inform the requester that an email has been sent if applicable.
-        return Response({"message": "Password reset email sent."}, status=status.HTTP_200_OK)
+        return Response({"message": reset_message}, status=status.HTTP_200_OK)
         
 class ResetPasswordRequestView(APIView):
     def post(self, request):
