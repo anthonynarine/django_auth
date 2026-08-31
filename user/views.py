@@ -305,6 +305,8 @@ class LoginAPIView(APIView):
         # Log the user in, which establishes the user's session.
         login(request, user)
         for scope, kwargs in _login_abuse_call_args(request=request, email=email or None):
+            if scope == "LOGIN_IP":
+                continue
             abuse_record_success(scope, **kwargs)
 
         # Check if the 2FA setup was incomplete and reset if necessary
@@ -349,6 +351,9 @@ class LoginAPIView(APIView):
                 request=request,
                 metadata={"authentication_method": "password"},
             )
+            # Keep broad LOGIN_IP history intact so one successful account
+            # login does not erase a shared-IP abuse signal for other users.
+            # LOGIN_ACCOUNT and LOGIN_IP_ACCOUNT remain cleared on success.
             response = Response({
                 "message": "Logged in successfully.",
                 "access_token": access_token,

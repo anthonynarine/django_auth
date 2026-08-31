@@ -3,6 +3,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
 from copy import deepcopy
+from datetime import timedelta
 from unittest import skipUnless
 
 from django.conf import settings
@@ -11,8 +12,9 @@ from django.core.cache import cache
 from django.db import close_old_connections, connection
 from django.test import Client, TransactionTestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
-from abuse.services import record_failure as abuse_record_failure
+from abuse.services import _key_hash, record_failure as abuse_record_failure
 from abuse.models import AbuseCounter
 from security.models import SecurityEvent
 from user.auth_token import create_temporary_2fa_token
@@ -61,6 +63,31 @@ class LoginAndResetAbuseControlTest(TransactionTestCase):
         self.assertTrue(
             SecurityEvent.objects.filter(event_type=SecurityEvent.EventType.LOGIN_THROTTLED).exists()
         )
+
+    @override_settings(ABUSE_CONTROL_POLICIES=deepcopy(settings.ABUSE_CONTROL_POLICIES))
+    def test_successful_login_does_not_clear_broad_ip_history(self):
+        other = User.objects.create_user(email="a5-other@example.com", password=self.password)
+        ip = "198.51.100.77"
+        now = timezone.now()
+        AbuseCounter.objects.create(
+            scope="LOGIN_IP",
+            key_hash=_key_hash("LOGIN_IP", {"ip": ip}),
+            window_started_at=now,
+            window_expires_at=now + timedelta(seconds=60),
+            attempt_count=4,
+        )
+
+        good = {"email": other.email, "password": self.password}
+        success = self.client.post(
+            reverse("login"),
+            good,
+            content_type="application/json",
+            REMOTE_ADDR=ip,
+        )
+        self.assertEqual(success.status_code, 200)
+
+        ip_counter = AbuseCounter.objects.get(scope="LOGIN_IP")
+        self.assertEqual(ip_counter.attempt_count, 4)
 
     def test_password_reset_request_throttles_after_threshold(self):
         payload = {"email": "missing-abuse@example.com"}
