@@ -803,8 +803,11 @@ class ForgotPasswordRequestView(APIView):
         # Generate a secure token for the password reset process.
         token = PasswordResetTokenGenerator().make_token(user)
 
-        # Create a reset instance to track this request.
-        Reset.objects.create(email=email, token=token)
+        # Keep only the latest reset record for this email so repeated reset
+        # requests remain idempotent and do not collide on the unique token
+        # constraint if the password-reset generator returns the same token.
+        Reset.objects.filter(email=normalized_email).delete()
+        Reset.objects.create(email=normalized_email, token=token)
 
         # Build the password reset link with the user ID encoded and token.
         react_app_base_url = settings.REACT_APP_BASE_URL

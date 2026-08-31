@@ -77,6 +77,18 @@ class PasswordResetExpiryTest(TestCase):
         response = self.client.post(reverse("reset_password"), payload, content_type="application/json")
         self.assertEqual(response.status_code, 202)
 
+    @patch("user.views.EmailMultiAlternatives.send", return_value=1)
+    def test_repeated_forgot_password_requests_remain_idempotent(self, mock_send):
+        payload = {"email": self.user.email}
+
+        first = self.client.post(reverse("forgot_password"), payload, content_type="application/json")
+        second = self.client.post(reverse("forgot_password"), payload, content_type="application/json")
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(Reset.objects.filter(email=self.user.email).count(), 1)
+        self.assertEqual(mock_send.call_count, 2)
+
     @override_settings(PASSWORD_RESET_TIMEOUT=1)
     def test_expired_token_is_rejected(self):
         import time
