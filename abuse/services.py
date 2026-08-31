@@ -111,6 +111,7 @@ def _retry_after_seconds(counter: AbuseCounter, now, policy: dict[str, int], sta
 
 
 def _scope_event_type(scope: str, state: str) -> str:
+    family = scope.split("_", 1)[0]
     mapping = {
         ("LOGIN", AbuseState.THROTTLED): SecurityEvent.EventType.LOGIN_THROTTLED,
         ("LOGIN", AbuseState.BLOCKED): SecurityEvent.EventType.LOGIN_BLOCKED,
@@ -125,7 +126,7 @@ def _scope_event_type(scope: str, state: str) -> str:
         ("MFA_CHANGE", AbuseState.THROTTLED): SecurityEvent.EventType.MFA_CHANGE_THROTTLED,
         ("MFA_CHANGE", AbuseState.BLOCKED): SecurityEvent.EventType.MFA_CHANGE_BLOCKED,
     }
-    return mapping.get((scope, state), "")
+    return mapping.get((family, state), "")
 
 
 def _scope_reason_code(scope: str, state: str) -> str:

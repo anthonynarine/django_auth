@@ -14,6 +14,7 @@ from django.urls import reverse
 
 from abuse.services import record_failure as abuse_record_failure
 from abuse.models import AbuseCounter
+from security.models import SecurityEvent
 from user.auth_token import create_temporary_2fa_token
 
 
@@ -57,6 +58,9 @@ class LoginAndResetAbuseControlTest(TransactionTestCase):
         throttled = self.client.post(reverse("login"), payload, content_type="application/json")
         self.assertEqual(throttled.status_code, 429)
         self.assertIn("Retry-After", throttled)
+        self.assertTrue(
+            SecurityEvent.objects.filter(event_type=SecurityEvent.EventType.LOGIN_THROTTLED).exists()
+        )
 
     def test_password_reset_request_throttles_after_threshold(self):
         payload = {"email": "missing-abuse@example.com"}
