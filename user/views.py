@@ -842,7 +842,9 @@ class ForgotPasswordRequestView(APIView):
         except Exception as e:
             # Log any failures with sending the email.
             logger.error(f"Failed to send password reset email: {e}")
-            return Response({"error": "Failed to send password reset email"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            # Keep the public response generic so mail-transport failures do not
+            # become an account-existence oracle.
+            return Response({"message": reset_message}, status=status.HTTP_200_OK)
 
         # Inform the requester that an email has been sent if applicable.
         return Response({"message": reset_message}, status=status.HTTP_200_OK)

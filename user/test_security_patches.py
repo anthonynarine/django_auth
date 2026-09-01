@@ -94,6 +94,24 @@ class PasswordResetExpiryTest(TestCase):
         self.assertEqual(Reset.objects.filter(email=self.user.email).count(), 1)
         self.assertEqual(mock_send.call_count, 2)
 
+    @patch("user.views.EmailMultiAlternatives.send", side_effect=Exception("smtp unavailable"))
+    def test_forgot_password_send_failure_remains_generic(self, mock_send):
+        known = self.client.post(reverse("forgot_password"), {"email": self.user.email}, content_type="application/json")
+        unknown = self.client.post(
+            reverse("forgot_password"),
+            {"email": "missing-reset@example.com"},
+            content_type="application/json",
+        )
+
+        self.assertEqual(known.status_code, 200)
+        self.assertEqual(unknown.status_code, 200)
+        self.assertEqual(known.json(), unknown.json())
+        self.assertEqual(
+            known.json()["message"],
+            "If the email is registered with us, you will receive a password reset link shortly.",
+        )
+        self.assertGreaterEqual(mock_send.call_count, 1)
+
     @override_settings(PASSWORD_RESET_TIMEOUT=1)
     def test_expired_token_is_rejected(self):
         import time
