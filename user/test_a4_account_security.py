@@ -230,7 +230,7 @@ class RecentAuthAndMfaTest(TransactionTestCase):
         self.assertTrue(
             SecurityEvent.objects.filter(
                 user=user,
-                event_type=SecurityEvent.EventType.MFA_CHANGE_DENIED,
+                event_type=SecurityEvent.EventType.STEP_UP_REQUIRED,
                 reason_code="RECENT_AUTH_REQUIRED",
             ).exists()
         )

@@ -83,6 +83,21 @@ Three distinct JWTs, each with its own secret and lifetime (`user/auth_token.py`
 
 Roles (`user/roles.py` — `admin`, `physician`, `technologist`, default `technologist`) are embedded directly in access and refresh tokens, so any consumer of the token can check a user's role without a database round trip.
 
+## Session, assurance, and security controls
+
+The JWTs are only part of the picture now. The backend also maintains a server-side `AuthSession` record for each live auth session. That session tracks:
+
+- `sid` — a stable UUID session identifier
+- `recent_auth_at` — when the last qualifying strong proof happened
+- `authentication_method` — how the session was established
+- `authentication_strength` — the current assurance level (`password` or `mfa`)
+
+That `AuthSession` data powers the generalized step-up layer introduced in A6. Sensitive actions consult a central evaluator that checks freshness and strength, then returns `403 STEP_UP_REQUIRED` when the current session is authenticated but not sufficiently fresh or strong.
+
+A5 adds a separate PostgreSQL-backed `AbuseCounter` model for noisy flows like login, OTP, password reset, reauthentication, and MFA change. Those counters are authoritative across requests and workers; they are not the same thing as `AuthSession`, and they do not represent account state.
+
+The durable `SecurityEvent` table is the append-only audit trail. It records what happened, but it does not participate in the authorization decision itself.
+
 ## Data model
 
 ```mermaid

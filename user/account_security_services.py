@@ -25,6 +25,11 @@ from .session_services import (
     revoke_other_sessions,
     touch_session,
 )
+from .step_up import (
+    STEP_UP_POLICIES,
+    StepUpRequirement,
+    require_step_up,
+)
 
 
 def get_recent_auth_max_age_seconds() -> int:
@@ -62,23 +67,18 @@ def require_recent_auth(
     failure_event: str,
     failure_reason: str = "RECENT_AUTH_REQUIRED",
 ):
-    if is_recent_auth(session):
-        return session
-
-    record_security_event(
-        failure_event,
-        outcome=SecurityEvent.Outcome.DENIED,
-        severity=SecurityEvent.Severity.WARNING,
-        reason_code=failure_reason,
-        user=user,
-        auth_session=session,
-        request=request,
-        metadata={
-            "operation": operation,
-            "recent_auth_max_age_seconds": get_recent_auth_max_age_seconds(),
-        },
+    requirement = StepUpRequirement(
+        minimum_strength="password",
+        max_auth_age_seconds=get_recent_auth_max_age_seconds(),
     )
-    raise exceptions.PermissionDenied("Recent authentication required.")
+    return require_step_up(
+        session,
+        requirement,
+        request=request,
+        user=user,
+        operation=operation,
+        failure_event=failure_event,
+    )
 
 
 def reauthenticate_session(
@@ -112,6 +112,16 @@ def reauthenticate_session(
         abuse_record_failure("REAUTH_SESSION", request=request, user=user, auth_session=session, account=user.email)
         abuse_record_failure("REAUTH_ACCOUNT", request=request, user=user, account=user.email)
         record_security_event(
+            SecurityEvent.EventType.STEP_UP_FAILURE,
+            outcome=SecurityEvent.Outcome.FAILURE,
+            severity=SecurityEvent.Severity.WARNING,
+            reason_code="CURRENT_PASSWORD_INVALID",
+            user=user,
+            auth_session=session,
+            request=request,
+            metadata={"authentication_method": "password"},
+        )
+        record_security_event(
             SecurityEvent.EventType.REAUTH_FAILURE,
             outcome=SecurityEvent.Outcome.FAILURE,
             severity=SecurityEvent.Severity.WARNING,
@@ -127,6 +137,16 @@ def reauthenticate_session(
             abuse_record_failure("REAUTH_SESSION", request=request, user=user, auth_session=session, account=user.email)
             abuse_record_failure("REAUTH_ACCOUNT", request=request, user=user, account=user.email)
             record_security_event(
+                SecurityEvent.EventType.STEP_UP_FAILURE,
+                outcome=SecurityEvent.Outcome.FAILURE,
+                severity=SecurityEvent.Severity.WARNING,
+                reason_code="INVALID_OTP",
+                user=user,
+                auth_session=session,
+                request=request,
+                metadata={"authentication_method": "password+totp"},
+            )
+            record_security_event(
                 SecurityEvent.EventType.REAUTH_FAILURE,
                 outcome=SecurityEvent.Outcome.FAILURE,
                 severity=SecurityEvent.Severity.WARNING,
@@ -139,6 +159,16 @@ def reauthenticate_session(
         if not pyotp.TOTP(user.tfa_secret).verify(otp, valid_window=1):
             abuse_record_failure("REAUTH_SESSION", request=request, user=user, auth_session=session, account=user.email)
             abuse_record_failure("REAUTH_ACCOUNT", request=request, user=user, account=user.email)
+            record_security_event(
+                SecurityEvent.EventType.STEP_UP_FAILURE,
+                outcome=SecurityEvent.Outcome.FAILURE,
+                severity=SecurityEvent.Severity.WARNING,
+                reason_code="INVALID_OTP",
+                user=user,
+                auth_session=session,
+                request=request,
+                metadata={"authentication_method": "password+totp"},
+            )
             record_security_event(
                 SecurityEvent.EventType.REAUTH_FAILURE,
                 outcome=SecurityEvent.Outcome.FAILURE,
@@ -157,6 +187,19 @@ def reauthenticate_session(
 
     touch_session(session, request=request, authentication_strength=strength)
     abuse_record_success(["REAUTH_SESSION", "REAUTH_ACCOUNT"], request=request, user=user, auth_session=session, account=user.email)
+    record_security_event(
+        SecurityEvent.EventType.STEP_UP_SUCCESS,
+        outcome=SecurityEvent.Outcome.SUCCESS,
+        severity=SecurityEvent.Severity.INFO,
+        reason_code=authentication_method.replace("+", "_").upper(),
+        user=user,
+        auth_session=session,
+        request=request,
+        metadata={
+            "authentication_method": authentication_method,
+            "required_strength": strength,
+        },
+    )
     record_security_event(
         SecurityEvent.EventType.REAUTH_SUCCESS,
         outcome=SecurityEvent.Outcome.SUCCESS,
@@ -186,12 +229,13 @@ def change_password(
     if not decision.allowed:
         raise exceptions.Throttled(wait=decision.retry_after_seconds)
 
-    require_recent_auth(
+    require_step_up(
         session,
+        STEP_UP_POLICIES["PASSWORD_CHANGE"],
         request=request,
         user=user,
         operation="PASSWORD_CHANGE",
-        failure_event=SecurityEvent.EventType.PASSWORD_CHANGE_FAILURE,
+        failure_event=SecurityEvent.EventType.STEP_UP_REQUIRED,
     )
 
     if not user.check_password(current_password):
@@ -255,12 +299,13 @@ def disable_mfa(
     if not decision.allowed:
         raise exceptions.Throttled(wait=decision.retry_after_seconds)
 
-    require_recent_auth(
+    require_step_up(
         session,
+        STEP_UP_POLICIES["MFA_DISABLE"],
         request=request,
         user=user,
         operation="MFA_DISABLE",
-        failure_event=SecurityEvent.EventType.MFA_CHANGE_DENIED,
+        failure_event=SecurityEvent.EventType.STEP_UP_REQUIRED,
     )
 
     if not user.is_2fa_enabled:

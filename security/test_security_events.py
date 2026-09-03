@@ -53,6 +53,51 @@ class SecurityEventServiceTest(TestCase):
         self.assertEqual(event.metadata["nested"]["refresh_token"], "[REDACTED]")
         self.assertEqual(event.metadata["safe_value"], "kept")
 
+    def test_step_up_events_use_expected_defaults(self):
+        request = self.factory.post("/api/reauthenticate/")
+
+        with self.captureOnCommitCallbacks(execute=True):
+            record_security_event(
+                SecurityEvent.EventType.STEP_UP_REQUIRED,
+                request=request,
+                reason_code="RECENT_AUTH_REQUIRED",
+            )
+            record_security_event(
+                SecurityEvent.EventType.STEP_UP_SUCCESS,
+                request=request,
+                reason_code="PASSWORD",
+            )
+            record_security_event(
+                SecurityEvent.EventType.STEP_UP_FAILURE,
+                request=request,
+                reason_code="INVALID_OTP",
+            )
+
+        self.assertEqual(
+            SecurityEvent.objects.filter(event_type=SecurityEvent.EventType.STEP_UP_REQUIRED).get().outcome,
+            SecurityEvent.Outcome.DENIED,
+        )
+        self.assertEqual(
+            SecurityEvent.objects.filter(event_type=SecurityEvent.EventType.STEP_UP_REQUIRED).get().severity,
+            SecurityEvent.Severity.WARNING,
+        )
+        self.assertEqual(
+            SecurityEvent.objects.filter(event_type=SecurityEvent.EventType.STEP_UP_SUCCESS).get().outcome,
+            SecurityEvent.Outcome.SUCCESS,
+        )
+        self.assertEqual(
+            SecurityEvent.objects.filter(event_type=SecurityEvent.EventType.STEP_UP_SUCCESS).get().severity,
+            SecurityEvent.Severity.INFO,
+        )
+        self.assertEqual(
+            SecurityEvent.objects.filter(event_type=SecurityEvent.EventType.STEP_UP_FAILURE).get().outcome,
+            SecurityEvent.Outcome.FAILURE,
+        )
+        self.assertEqual(
+            SecurityEvent.objects.filter(event_type=SecurityEvent.EventType.STEP_UP_FAILURE).get().severity,
+            SecurityEvent.Severity.WARNING,
+        )
+
     def test_security_event_admin_is_read_only(self):
         event_admin = SecurityEventAdmin(SecurityEvent, admin.site)
         session_admin = AuthSessionAdmin(AuthSession, admin.site)

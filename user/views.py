@@ -56,9 +56,9 @@ from .account_security_services import (
     change_password as perform_password_change,
     disable_mfa as perform_mfa_disable,
     reauthenticate_session,
-    require_recent_auth,
     resolve_current_auth_session,
 )
+from .step_up import STEP_UP_POLICIES, require_step_up
 from .serializers import CustomUserSerializer
 from .guest import DEMO_USER_EMAIL
 from .rabbitmq_producer import send_user_registered_message
@@ -566,12 +566,13 @@ class GenerateQRCodeAPIView(APIView):
     def get(self, request, *args, **kwargs):
         user = request.user
         session = resolve_current_auth_session(request)
-        require_recent_auth(
+        require_step_up(
             session,
+            STEP_UP_POLICIES["MFA_SETUP"],
             request=request,
             user=user,
             operation="MFA_ENABLE",
-            failure_event=SecurityEvent.EventType.MFA_CHANGE_DENIED,
+            failure_event=SecurityEvent.EventType.STEP_UP_REQUIRED,
         )
 
         if not user.tfa_secret:
@@ -995,12 +996,13 @@ class Verify2FASetupAPIView(APIView):
         otp_provided = request.data.get("otp")
         otp_calls = _otp_abuse_call_args(request=request, user=user, session=session)
 
-        require_recent_auth(
+        require_step_up(
             session,
+            STEP_UP_POLICIES["MFA_SETUP"],
             request=request,
             user=user,
             operation="MFA_ENABLE",
-            failure_event=SecurityEvent.EventType.MFA_CHANGE_DENIED,
+            failure_event=SecurityEvent.EventType.STEP_UP_REQUIRED,
         )
 
         blocked = _first_blocked_abuse_decision(otp_calls)

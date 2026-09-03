@@ -4,11 +4,11 @@ This document tracks what's actually been hardened, what's a deliberate deferred
 
 ## Hardened
 
-### Rate limiting
+### PostgreSQL-backed abuse control
 
-Login, OTP verification, and password-reset requests are throttled to **5 requests/minute per client** via DRF's `ScopedRateThrottle` (`authentication/settings.py`, `REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]`). Before this, none of these endpoints had any limit — a 6-digit TOTP code (1,000,000 combinations) or a user's password were both brute-forceable with no friction. `ScopedRateThrottle` is a no-op for any view that doesn't set `throttle_scope`, so enabling it globally didn't touch unrelated views.
+Login, OTP verification, password reset, reauthentication, and MFA-change requests are now enforced by the A5 abuse-control engine. Instead of process-local cache counters, these flows use authoritative PostgreSQL-backed `AbuseCounter` rows with explicit scope, key, window, and block state. When a policy says "no", the API returns `429 Too Many Requests` and a bounded `Retry-After` header.
 
-Caveat: throttle counters live in Django's default cache (`LocMemCache` unless overridden), which is per-process. On a multi-dyno or multi-worker deployment, this is a soft limit, not a hard one — each process tracks its own count. Good enough to blunt casual brute forcing; not a substitute for a shared cache (Redis/Memcached) if this service scales horizontally.
+This is the actual enforcement layer for high-risk auth flows. It persists across requests, workers, and dynos, which is why a fresh browser can still be denied if the underlying abuse state is still active.
 
 ### Password reset token expiry
 
@@ -25,6 +25,16 @@ Operational secrets and temporary credentials MUST NOT be passed inline in Herok
 ### CSRF exemption is now an explicit allowlist
 
 `DisableCSRFMiddleware` used to exempt **all** of `/api/*` unconditionally. It's now an explicit list of the specific endpoints that need it. Behavior is unchanged for every endpoint that exists today — this is a defense-in-depth change, not a new restriction — but a future endpoint added to `user/urls.py` no longer inherits CSRF exemption automatically; it has to be added to the allowlist deliberately.
+
+### Generalized step-up authentication
+
+Sensitive account actions now use a shared step-up evaluator instead of one-off freshness checks. The current policy is built on `AuthSession.recent_auth_at` and `authentication_strength`:
+
+- password change requires recent password proof
+- MFA setup requires recent password proof
+- MFA disable requires recent MFA proof
+
+If the session is authenticated but the assurance level is insufficient, the backend returns `403 STEP_UP_REQUIRED`. That denial does **not** revoke the session, refresh credentials, or log the user out; it simply requires stronger or fresher proof before continuing.
 
 ## Deliberate, deferred trade-offs
 
@@ -43,6 +53,5 @@ The frontend (`gaitobservatory.com`) and this API (`herokuapp.com`) are on **dif
 ## Known, lower-priority gaps (not yet addressed)
 
 - **Weak password policy** — only `UserAttributeSimilarityValidator` and an 8-character minimum are active; a common-password blocklist is commented out in `settings.py` with an unfinished `# TODO`.
-- **No account lockout** after repeated failed logins (rate limiting reduces, but doesn't eliminate, brute-force risk).
 - **No explicit `SECURE_SSL_REDIRECT` / HSTS** configuration in `settings.py` (some of this may be covered by `django-heroku`'s defaults — not independently verified).
 - **Access tokens are not revocable** — by design (a 15-minute JWT is short-lived enough that this is a reasonable trade-off), but worth remembering if that lifetime is ever extended.

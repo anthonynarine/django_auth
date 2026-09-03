@@ -18,13 +18,14 @@ Create an account. No authentication required.
 
 ### `POST /login/`
 
-Authenticate with email + password. No authentication required. **Throttled: 5/min per client.**
+Authenticate with email + password. No authentication required. Protected by PostgreSQL-backed abuse control.
 
 **Body:** `{ "email", "password" }`
 **200** → `{ "message", "access_token", "refresh_token" }`
 **401** → `{"2fa_required": true}` + `temp_token` cookie set, if 2FA is enabled on the account
 **401** → `{"error": "Invalid email or password"}` on bad credentials
 **400** → missing email/password
+**429** → abuse threshold reached for the current login scope (`Retry-After` included)
 
 ---
 
@@ -36,6 +37,7 @@ Complete a login that returned `2fa_required`. Requires the `temp_token` cookie 
 **200** → `{ "message", "access_token", "refresh_token" }` + `csrftoken` cookie
 **400** → missing OTP or temp_token
 **401** → invalid/expired temp_token, or incorrect OTP
+**429** → abuse threshold reached for the current OTP scope (`Retry-After` included)
 
 ---
 
@@ -58,10 +60,11 @@ Revoke the current refresh token and clear the session. Reads `refresh_token` fr
 
 ### `POST /forgot-password/`
 
-Request a password-reset email. No authentication required. **Throttled: 5/min per client.**
+Request a password-reset email. No authentication required. Protected by PostgreSQL-backed abuse control.
 
 **Body:** `{ "email" }`
 **200** → always the same generic message, regardless of whether the email is registered (prevents enumeration)
+**429** → abuse threshold reached for the current reset scope (`Retry-After` included)
 
 ---
 
@@ -75,21 +78,48 @@ Set a new password using a reset token from the emailed link.
 
 ---
 
+### `POST /change-password/`
+
+Change the currently authenticated user's password. Requires an active session and recent step-up proof. The user supplies the current password plus a new password.
+
+**Body:** `{ "current_password", "new_password", "new_password_confirm" }`
+**200** → `{ "message": "Password changed successfully." }`
+**400** → missing fields, mismatched passwords, wrong current password, or Django password-validator failure
+**403** → `{"code": "STEP_UP_REQUIRED", ...}` when the current session is too stale or too weak
+**429** → abuse threshold reached for the current reauthentication/password-change scope (`Retry-After` included)
+
+---
+
+### `POST /reauthenticate/`
+
+Refresh recent-auth assurance without creating a new session. Requires an active authenticated session.
+
+**Body:** `{ "current_password", "otp"? }`
+**200** → `{ "message": "Reauthenticated successfully." }` and the session's `recent_auth_at` is updated
+**400** → missing current password, wrong current password, or invalid OTP
+**403** → `{"code": "STEP_UP_REQUIRED", ...}` when the current session is too stale or too weak
+**429** → abuse threshold reached for the current reauthentication scope (`Retry-After` included)
+
+---
+
 ### `GET /generate-qr/`
 
-Return a PNG QR code for setting up 2FA in an authenticator app. Requires an active session (`login_required`). Generates and persists `tfa_secret` on first call if none exists.
+Return a PNG QR code for setting up 2FA in an authenticator app. Requires an active session and recent step-up proof. Generates and persists `tfa_secret` on first call if none exists.
 
 **200** → `image/png`
+**403** → `{"code": "STEP_UP_REQUIRED", ...}` when the current session is too stale or too weak
 
 ---
 
 ### `POST /verify-otp/`
 
-Confirm 2FA setup with the first OTP from the authenticator app. Requires an active session. **Throttled: 5/min per client.**
+Confirm 2FA setup with the first OTP from the authenticator app. Requires an active session and the step-up state required by the setup flow.
 
 **Body:** `{ "otp" }`
 **200** → `{ "message", "access_token", "refresh_token" }` + `csrftoken` cookie — enables 2FA and rotates tokens
 **400** → `{"error": {"tfa_setup": "2FA is not set up."}}` if setup was never started, or `{"error": {"otp": "..."}}` on a wrong code
+**403** → `{"code": "STEP_UP_REQUIRED", ...}` when the current session is too stale or too weak
+**429** → abuse threshold reached for the current OTP scope (`Retry-After` included)
 
 ---
 
@@ -122,6 +152,32 @@ Identical contract to `/validate-session/`, intended for external services (e.g.
 
 ---
 
+## Security Observatory (`security/urls.py`)
+
+All of these routes are staff-only. Non-staff authenticated users receive `403`; anonymous callers receive the existing auth failure behavior.
+
+### `GET /security/summary/`
+
+Return a dashboard summary for the current window.
+
+### `GET /security/events/`
+
+Return a paginated, filterable list of `SecurityEvent` rows.
+
+### `GET /security/events/{id}/`
+
+Return one `SecurityEvent` row.
+
+### `GET /security/sessions/`
+
+Return a paginated list of active and historical `AuthSession` rows.
+
+### `GET /security/sessions/{id}/`
+
+Return one `AuthSession` row.
+
+---
+
 ### `POST /test-csrf-exempt/`
 
 Diagnostic endpoint confirming the CSRF-exemption allowlist is wired correctly. Not part of the product surface.
@@ -147,7 +203,8 @@ Returned by `/register/`, `/validate-session/`, `/whoami/` (`user/serializers.py
   "last_name": "Lovelace",
   "email": "ada@example.com",
   "is_2fa_enabled": false,
-  "role": "technologist"
+  "role": "technologist",
+  "is_staff": false
 }
 ```
 

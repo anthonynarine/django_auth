@@ -84,26 +84,58 @@ sequenceDiagram
     API->>API: user.is_2fa_setup_in_progress = true
     API-->>FE: 200 {"is_2fa_setup_in_progress": true}
 
-    FE->>API: GET /api/generate-qr/  (requires an active session)
-    API->>API: generate tfa_secret if none exists (pyotp.random_base32)
-    API->>API: build otpauth:// provisioning URI, render as QR PNG
-    API-->>FE: image/png
+    FE->>API: GET /api/generate-qr/  (requires an active session + recent step-up)
+    alt assurance insufficient
+        API-->>FE: 403 {"code": "STEP_UP_REQUIRED", "required_strength": "password"}
+        Note over FE: prompt user for reauthentication
+    else assurance sufficient
+        API->>API: generate tfa_secret if none exists (pyotp.random_base32)
+        API->>API: build otpauth:// provisioning URI, render as QR PNG
+        API-->>FE: image/png
+    end
 
     U->>U: Scan QR code in authenticator app
 
     FE->>API: POST /api/verify-otp/ {otp}
-    Note over API: throttled: 5 requests / min per client
-    API->>API: pyotp.TOTP(user.tfa_secret).verify(otp)
+    API->>API: evaluate step-up + verify OTP
     alt OTP correct
         API->>API: is_2fa_enabled = true, is_2fa_setup_in_progress = false
         API->>API: delete old refresh token, issue new access + refresh tokens
         API-->>FE: 200 new tokens + csrftoken cookie
-    else OTP incorrect
-        API-->>FE: 400 {"error": {"otp": "Invalid OTP. Please try again"}}
+    else OTP incorrect or assurance insufficient
+        API-->>FE: 400/403 {"error": {"otp": "Invalid OTP. Please try again"}} or STEP_UP_REQUIRED
     end
 ```
 
 If a user starts this flow and abandons it, `is_2fa_setup_in_progress` is left dangling `true` — it gets silently reset to a clean disabled state on their **next successful login** (see the "Check if the 2FA setup was incomplete" step in `LoginAPIView`).
+
+## Generalized step-up / reauthentication
+
+```mermaid
+sequenceDiagram
+    participant FE as React SPA
+    participant API as Django API
+    participant AS as AuthSession
+
+    FE->>API: sensitive action (e.g. change password, MFA disable)
+    API->>AS: evaluate step-up requirement
+    alt assurance sufficient
+        API-->>FE: 200/202 as appropriate
+    else assurance insufficient
+        API-->>FE: 403 {"code": "STEP_UP_REQUIRED", "required_strength": "password|mfa"}
+        FE->>FE: open reauthentication UI
+        FE->>API: POST /api/reauthenticate/ {current_password, otp?}
+        API->>API: verify proof against current session
+        alt proof valid
+            API->>AS: update recent_auth_at (+ strength if proven)
+            API-->>FE: 200 {"message": "Reauthenticated"}
+        else proof invalid
+            API-->>FE: 400/401/403 failure
+        end
+    end
+```
+
+This is the shared path for sensitive operations. Password change and MFA lifecycle actions now use the same underlying assurance rules instead of bespoke freshness checks.
 
 ## Token refresh
 

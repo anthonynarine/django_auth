@@ -6,7 +6,7 @@
 [![JWT](https://img.shields.io/badge/auth-JWT%20%2B%20TOTP%202FA-blueviolet)](https://pyjwt.readthedocs.io/)
 [![Deployed](https://img.shields.io/badge/deployed-Heroku-430098?logo=heroku&logoColor=white)](https://ant-django-auth-62cf01255868.herokuapp.com/)
 
-A standalone Django REST authentication service: registration, login, JWT access/refresh tokens, TOTP-based two-factor authentication, and password reset — built to be consumed by other services (like the [Lumen](https://github.com/anthonynarine) platform) as a central identity provider.
+A standalone Django REST authentication service: registration, login, JWT access/refresh tokens, TOTP-based two-factor authentication, password reset, generalized step-up authentication, and a durable security audit trail — built to be consumed by other services (like the [Lumen](https://github.com/anthonynarine) platform) as a central identity provider.
 
 **Live API:** `https://ant-django-auth-62cf01255868.herokuapp.com/api`
 **Reference frontend:** [gaitobservatory.com](https://gaitobservatory.com) ([AuthFlow](https://github.com/anthonynarine/AuthFlow) repo). The legacy Netlify subdomain, `https://gait.netlify.app`, remains temporarily allowed during the domain cutover.
@@ -29,9 +29,27 @@ A standalone Django REST authentication service: registration, login, JWT access
 - **JWT access + refresh tokens** — short-lived (15 min) access tokens, DB-revocable 7-day refresh tokens.
 - **Two-factor authentication** — TOTP via an authenticator app (`pyotp`), with a QR-code setup flow.
 - **Password reset** — token-based, single-use, and time-limited.
-- **Rate limiting** — login, OTP verification, and password-reset requests are throttled per client.
+- **PostgreSQL-backed abuse control** — login, OTP verification, password reset, reauthentication, and MFA-change flows use authoritative counters with `429` / `Retry-After`.
+- **Generalized step-up authentication** — sensitive actions require recent password or MFA proof instead of bespoke one-off checks.
+- **Security audit trail** — durable `SecurityEvent` rows power the staff-only Security Observatory.
 - **Role-aware tokens** — `admin` / `physician` / `technologist` roles are embedded directly in the JWT payload, so downstream services don't need a DB round trip to check them.
 - **Best-effort side effects** — registration publishes a RabbitMQ event and sends a transactional email; neither failure blocks account creation.
+
+## Security at a glance
+
+```mermaid
+flowchart LR
+    FE[React frontend] -->|Authorization: Bearer| API[Django API]
+    API --> AUTH[AuthSession + JWT validation]
+    AUTH --> STEPUP[Step-up policy]
+    AUTH --> ABUSE[PostgreSQL abuse control]
+    AUTH --> EVENTS[SecurityEvent trail]
+    STEPUP -->|recent password / recent MFA| ACTIONS[Sensitive actions]
+    ABUSE -->|429 / Retry-After| ACTIONS
+    EVENTS --> OBS[Security Observatory]
+```
+
+The current security model centers on a server-controlled `AuthSession`, recent-authentication checks for sensitive actions, and PostgreSQL-backed abuse control for noisy attack surfaces.
 
 ## Tech stack
 
@@ -92,9 +110,12 @@ All endpoints are namespaced under `/api/` (see `user/urls.py`) except the gener
 | `/api/reset-password/` | POST | Set a new password from a reset token |
 | `/api/generate-qr/` | GET | Get a TOTP QR code for 2FA setup |
 | `/api/verify-otp/` | POST | Confirm 2FA setup |
+| `/api/reauthenticate/` | POST | Refresh recent-auth assurance for sensitive actions |
+| `/api/change-password/` | POST | Change the current password with current-password verification |
 | `/api/user/toggle-2fa/` | PATCH | Start/stop the 2FA setup process |
 | `/api/validate-session/` | GET | Return the current authenticated user |
 | `/api/whoami/` | GET | Same as above, for external service integration |
+| `/api/security/*` | GET | Staff-only Security Observatory read APIs |
 
 ## Testing
 
