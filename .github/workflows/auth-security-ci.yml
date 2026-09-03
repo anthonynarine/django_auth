@@ -44,6 +44,7 @@ jobs:
             user.test_security_patches \
             user.test_a4_account_security \
             user.test_a5_abuse_control \
+            user.test_a6_step_up \
             user.test_middleware \
             security.test_security_events \
             --settings=authentication.test_settings \
@@ -113,6 +114,7 @@ jobs:
             user.test_security_patches \
             user.test_a4_account_security \
             user.test_a5_abuse_control \
+            user.test_a6_step_up \
             user.test_middleware \
             security.test_security_events \
             --settings=authentication.postgres_test_settings \
