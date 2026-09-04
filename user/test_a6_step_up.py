@@ -161,6 +161,43 @@ class StepUpIntegrationTest(TestCase):
             ).exists()
         )
 
+    def test_validate_session_bootstraps_csrf_for_browser_step_up_requests(self):
+        csrf_client = Client(enforce_csrf_checks=True)
+        user = User.objects.create_user(email="stepup-csrf-browser@example.com", password=self.password)
+        login = csrf_client.post(
+            reverse("login"),
+            {"email": user.email, "password": self.password},
+            content_type="application/json",
+        ).json()
+        session = AuthSession.objects.get(user=user)
+        session.recent_auth_at = timezone.now() - timedelta(seconds=601)
+        session.save(update_fields=["recent_auth_at"])
+
+        validate = csrf_client.get(
+            reverse("fetch_user"),
+            HTTP_AUTHORIZATION=f"Bearer {login['access_token']}",
+        )
+
+        self.assertEqual(validate.status_code, 200)
+        self.assertIn("X-CSRFToken", validate)
+        self.assertIn("csrftoken", csrf_client.cookies)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = csrf_client.post(
+                reverse("change_password"),
+                {
+                    "current_password": self.password,
+                    "new_password": "brand-new-password-123",
+                    "new_password_confirm": "brand-new-password-123",
+                },
+                content_type="application/json",
+                HTTP_AUTHORIZATION=f"Bearer {login['access_token']}",
+                HTTP_X_CSRFTOKEN=validate["X-CSRFToken"],
+            )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["code"], "STEP_UP_REQUIRED")
+
     def test_generate_qr_requires_recent_password_step_up(self):
         user = User.objects.create_user(email="stepup-enable@example.com", password=self.password)
         login = self._login(user)

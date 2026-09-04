@@ -697,7 +697,9 @@ class ValidateSessionAPIView(APIView):
         user_data = CustomUserSerializer(request.user).data
         user_data["is_staff"] = bool(request.user.is_staff)
         logger.debug(f"User data: {user_data}")
-        return Response(user_data)
+        response = Response(user_data)
+        response["X-CSRFToken"] = get_token(request)
+        return response
     
 @method_decorator(csrf_exempt, name="dispatch")
 class RefreshAPIView(APIView):

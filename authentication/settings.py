@@ -152,6 +152,7 @@ CORS_ALLOWED_ORIGINS = [
     *csv_config("CORS_ALLOWED_ORIGINS_EXTRA"),
 ]
 CORS_ALLOW_CREDENTIALS = True
+CORS_EXPOSE_HEADERS = ["X-CSRFToken", "Retry-After"]
 
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:3000',
