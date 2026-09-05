@@ -25,6 +25,9 @@ _SENSITIVE_KEY_PARTS = (
     "patient",
     "diagnosis",
     "phi",
+    "mrn",
+    "dob",
+    "medical_record_number",
 )
 
 
