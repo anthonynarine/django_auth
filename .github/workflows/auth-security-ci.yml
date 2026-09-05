@@ -68,6 +68,7 @@ jobs:
       - name: Record CI security evidence in disposable CI database
         run: |
           python manage.py security_collect_evidence \
+            --settings=authentication.test_settings \
             --environment ci \
             --source-name auth-security-ci \
             --source-reference "${GITHUB_WORKFLOW}:${GITHUB_JOB}:${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}:${GITHUB_SHA}" \
@@ -156,6 +157,7 @@ jobs:
       - name: Record CI security evidence in disposable CI database
         run: |
           python manage.py security_collect_evidence \
+            --settings=authentication.postgres_test_settings \
             --environment ci \
             --source-name auth-security-ci \
             --source-reference "${GITHUB_WORKFLOW}:${GITHUB_JOB}:${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}:${GITHUB_SHA}" \
