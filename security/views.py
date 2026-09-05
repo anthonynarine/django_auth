@@ -49,7 +49,7 @@ class SecurityEventDetailAPIView(generics.RetrieveAPIView):
     authentication_classes = [JWTAuthentication]
     permission_classes = [CanViewSecurityAudit]
     serializer_class = SecurityEventSerializer
-    queryset = SecurityEvent.objects.select_related("user", "auth_session")
+    queryset = SecurityEvent.objects.select_related("user", "auth_session", "auth_session__user")
 
 
 class SecuritySummaryAPIView(generics.GenericAPIView):

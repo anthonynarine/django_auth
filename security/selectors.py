@@ -21,7 +21,7 @@ def _apply_temporal_filters(queryset, *, created_from=None, created_to=None):
 
 def list_security_events(*, event_type=None, outcome=None, severity=None, user=None, session=None,
                          created_from=None, created_to=None):
-    queryset = SecurityEvent.objects.select_related("user", "auth_session")
+    queryset = SecurityEvent.objects.select_related("user", "auth_session", "auth_session__user")
     if event_type:
         queryset = queryset.filter(event_type=event_type)
     if outcome:
