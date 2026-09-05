@@ -11,6 +11,7 @@ from rest_framework.test import APIClient
 
 from security.admin import AuthSessionAdmin, SecurityEventAdmin
 from security.models import SecurityEvent
+from security.presentation import EVENT_TEMPLATES, EventCategory, describe_security_event
 from security.services import record_security_event
 from user.auth_token import create_access_token
 from user.models import AuthSession
@@ -108,6 +109,163 @@ class SecurityEventServiceTest(TestCase):
         self.assertFalse(session_admin.has_add_permission(None))
         self.assertFalse(session_admin.has_change_permission(None))
         self.assertFalse(session_admin.has_delete_permission(None))
+
+
+class SecurityEventPresentationTest(TestCase):
+    def _event(self, event_type, *, severity=SecurityEvent.Severity.INFO, reason_code=""):
+        return SecurityEvent(
+            event_type=event_type,
+            outcome=SecurityEvent.Outcome.SUCCESS,
+            severity=severity,
+            reason_code=reason_code,
+            metadata={},
+        )
+
+    def test_representative_event_mappings_are_human_readable(self):
+        cases = [
+            (
+                SecurityEvent.EventType.LOGIN_SUCCESS,
+                SecurityEvent.Severity.INFO,
+                "Successful sign-in",
+                EventCategory.AUTHENTICATION,
+                "Authentication",
+                "Normal activity",
+                "Allowed",
+                "No action required.",
+            ),
+            (
+                SecurityEvent.EventType.LOGIN_FAILURE,
+                SecurityEvent.Severity.WARNING,
+                "Sign-in attempt failed",
+                EventCategory.AUTHENTICATION,
+                "Authentication",
+                "Needs attention",
+                "Authentication failed",
+                "No action required unless repeated or unexpected attempts continue.",
+            ),
+            (
+                SecurityEvent.EventType.SESSION_REVOKED,
+                SecurityEvent.Severity.INFO,
+                "Session revoked",
+                EventCategory.SESSION_SECURITY,
+                "Session security",
+                "Normal activity",
+                "Session revoked",
+                "No action required if this revocation was expected.",
+            ),
+            (
+                SecurityEvent.EventType.REFRESH_REPLAY_DETECTED,
+                SecurityEvent.Severity.HIGH,
+                "Previously used session token detected",
+                EventCategory.SESSION_SECURITY,
+                "Session security",
+                "Security concern",
+                "Request blocked and affected authentication authority revoked",
+                "Review the affected account if this activity was unexpected.",
+            ),
+            (
+                SecurityEvent.EventType.STEP_UP_REQUIRED,
+                SecurityEvent.Severity.WARNING,
+                "Additional identity verification required",
+                EventCategory.STEP_UP,
+                "Step-up verification",
+                "Needs attention",
+                "Additional authentication required",
+                "No action required if the user intentionally initiated the sensitive operation.",
+            ),
+            (
+                SecurityEvent.EventType.STEP_UP_SUCCESS,
+                SecurityEvent.Severity.INFO,
+                "Additional identity verification completed",
+                EventCategory.STEP_UP,
+                "Step-up verification",
+                "Normal activity",
+                "Allowed",
+                "No action required.",
+            ),
+            (
+                SecurityEvent.EventType.STEP_UP_FAILURE,
+                SecurityEvent.Severity.WARNING,
+                "Additional identity verification failed",
+                EventCategory.STEP_UP,
+                "Step-up verification",
+                "Needs attention",
+                "Authentication failed",
+                "No action required unless repeated or unexpected attempts continue.",
+            ),
+            (
+                SecurityEvent.EventType.REAUTH_THROTTLED,
+                SecurityEvent.Severity.WARNING,
+                "Too many identity-verification attempts were throttled",
+                EventCategory.ABUSE_CONTROL,
+                "Abuse control",
+                "Needs attention",
+                "Temporarily throttled",
+                "No action required unless the activity was unexpected.",
+            ),
+            (
+                SecurityEvent.EventType.MFA_ENABLED,
+                SecurityEvent.Severity.INFO,
+                "Multi-factor authentication enabled",
+                EventCategory.MFA,
+                "Multi-factor authentication",
+                "Normal activity",
+                "Allowed",
+                "No action required if this change was expected.",
+            ),
+            (
+                SecurityEvent.EventType.PASSWORD_RESET_REQUESTED,
+                SecurityEvent.Severity.INFO,
+                "Password reset requested",
+                EventCategory.ACCOUNT_SECURITY,
+                "Account security",
+                "Normal activity",
+                "Request accepted",
+                "No action required unless repeated or unexpected requests continue.",
+            ),
+        ]
+
+        for event_type, severity, title, category, category_label, severity_label, system_response, action in cases:
+            with self.subTest(event_type=event_type):
+                presentation = describe_security_event(self._event(event_type, severity=severity))
+                self.assertEqual(presentation.title, title)
+                self.assertEqual(presentation.category, category)
+                self.assertEqual(presentation.category_label, category_label)
+                self.assertEqual(presentation.severity_label, severity_label)
+                self.assertTrue(presentation.description)
+                self.assertEqual(presentation.system_response, system_response)
+                self.assertEqual(presentation.recommended_action, action)
+
+    def test_reason_code_specializes_step_up_required(self):
+        generic = describe_security_event(
+            self._event(SecurityEvent.EventType.STEP_UP_REQUIRED, reason_code="")
+        )
+        specialized = describe_security_event(
+            self._event(SecurityEvent.EventType.STEP_UP_REQUIRED, reason_code="RECENT_AUTH_REQUIRED")
+        )
+
+        self.assertNotEqual(generic.description, specialized.description)
+        self.assertIn("too old", specialized.description)
+
+    def test_unknown_event_falls_back_safely(self):
+        event = self._event("NEW_FUTURE_EVENT", severity=SecurityEvent.Severity.CRITICAL)
+
+        presentation = describe_security_event(event)
+
+        self.assertEqual(event.event_type, "NEW_FUTURE_EVENT")
+        self.assertEqual(presentation.title, "Security activity recorded")
+        self.assertEqual(presentation.description, "Gait recorded a security-related event.")
+        self.assertEqual(presentation.category, EventCategory.SYSTEM_SECURITY)
+        self.assertEqual(presentation.severity_label, "Immediate attention")
+
+    def test_all_current_event_types_have_explicit_mappings(self):
+        missing = [
+            event_type
+            for event_type, _label in SecurityEvent.EventType.choices
+            if event_type not in EVENT_TEMPLATES
+        ]
+
+        self.assertEqual(missing, [])
 
 
 class SecurityEventFlowTest(TestCase):
@@ -325,7 +483,12 @@ class SecurityReadAccessTest(TestCase):
         self.assertEqual(event["user_email"], self.staff.email)
         self.assertEqual(event["event_label"], "Login success")
         self.assertEqual(event["outcome_label"], "Success")
-        self.assertEqual(event["severity_label"], "Info")
+        self.assertEqual(event["severity_label"], "Normal activity")
+        self.assertEqual(event["title"], "Successful sign-in")
+        self.assertEqual(event["category"], "AUTHENTICATION")
+        self.assertEqual(event["category_label"], "Authentication")
+        self.assertEqual(event["system_response"], "Allowed")
+        self.assertEqual(event["recommended_action"], "No action required.")
         self.assertEqual(event["reason_label"], "Password Login")
         self.assertEqual(event["session_user_email"], self.staff.email)
         self.assertIn(self.staff.email, event["session_display_name"])
@@ -334,9 +497,93 @@ class SecurityReadAccessTest(TestCase):
         self.assertEqual(session["user_display_name"], self.staff.email)
         self.assertEqual(session["status_code"], "ACTIVE")
         self.assertEqual(session["status"], "Active")
+        self.assertEqual(
+            session["status_description"],
+            "This session is currently active and may access protected resources according to normal authorization policy.",
+        )
         self.assertIn(self.staff.email, session["session_display_name"])
 
-    def test_non_staff_is_denied(self):
+        event_detail_response = self.client.get(
+            reverse("security:event-detail", kwargs={"pk": event["id"]})
+        )
+        session_detail_response = self.client.get(
+            reverse("security:session-detail", kwargs={"pk": session["id"]})
+        )
+        self.assertEqual(event_detail_response.status_code, 200)
+        self.assertEqual(session_detail_response.status_code, 200)
+        self.assertEqual(event_detail_response.json()["title"], "Successful sign-in")
+        self.assertEqual(session_detail_response.json()["status"], "Active")
+        self.assertIn("category_labels", summary_response.json())
+        self.assertIn("severity_labels", summary_response.json())
+
+    def test_event_api_preserves_core_fields_and_redacts_sensitive_metadata(self):
+        with self.captureOnCommitCallbacks(execute=True):
+            record_security_event(
+                SecurityEvent.EventType.REFRESH_REPLAY_DETECTED,
+                user=self.staff,
+                auth_session=self.session,
+                outcome=SecurityEvent.Outcome.REVOKED,
+                severity=SecurityEvent.Severity.HIGH,
+                reason_code="REFRESH_REPLAY",
+                metadata={
+                    "password": "plain-password",
+                    "otp": "123456",
+                    "token": "access-token",
+                    "refresh_token": "refresh-token",
+                    "authorization": "Bearer token",
+                    "mfa_secret": "mfa-secret-value",
+                    "safe_detail": "kept",
+                },
+            )
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.access_token}")
+
+        event = SecurityEvent.objects.get(event_type=SecurityEvent.EventType.REFRESH_REPLAY_DETECTED)
+        response = self.client.get(reverse("security:event-detail", kwargs={"pk": event.id}))
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        for field in ["id", "event_type", "outcome", "severity", "reason_code", "metadata"]:
+            self.assertIn(field, payload)
+        self.assertEqual(payload["event_type"], SecurityEvent.EventType.REFRESH_REPLAY_DETECTED)
+        self.assertEqual(payload["severity"], SecurityEvent.Severity.HIGH)
+        self.assertEqual(payload["severity_label"], "Security concern")
+        self.assertEqual(payload["metadata"]["safe_detail"], "kept")
+        self.assertEqual(payload["metadata"]["password"], "[REDACTED]")
+        self.assertEqual(payload["metadata"]["otp"], "[REDACTED]")
+        self.assertEqual(payload["metadata"]["token"], "[REDACTED]")
+        self.assertEqual(payload["metadata"]["refresh_token"], "[REDACTED]")
+        self.assertEqual(payload["metadata"]["authorization"], "[REDACTED]")
+        self.assertEqual(payload["metadata"]["mfa_secret"], "[REDACTED]")
+        rendered = str(payload)
+        self.assertNotIn("plain-password", rendered)
+        self.assertNotIn("123456", rendered)
+        self.assertNotIn("access-token", rendered)
+        self.assertNotIn("refresh-token", rendered)
+        self.assertNotIn("Bearer token", rendered)
+        self.assertNotIn("mfa-secret-value", rendered)
+
+    def test_event_api_returns_safe_fallback_for_unmapped_event_type(self):
+        event = SecurityEvent.objects.create(
+            event_type="NEW_FUTURE_EVENT",
+            outcome=SecurityEvent.Outcome.SUCCESS,
+            severity=SecurityEvent.Severity.WARNING,
+            user=self.staff,
+            auth_session=self.session,
+            metadata={},
+        )
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.access_token}")
+
+        response = self.client.get(reverse("security:event-detail", kwargs={"pk": event.id}))
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["event_type"], "NEW_FUTURE_EVENT")
+        self.assertEqual(payload["title"], "Security activity recorded")
+        self.assertEqual(payload["description"], "Gait recorded a security-related event.")
+        self.assertEqual(payload["category"], "SYSTEM_SECURITY")
+        self.assertEqual(payload["severity_label"], "Needs attention")
+
+    def test_non_staff_is_denied_from_observatory_endpoints(self):
         non_staff = User.objects.create_user(
             email="audit-user@example.com",
             password="correct-horse-battery",
@@ -345,6 +592,31 @@ class SecurityReadAccessTest(TestCase):
         token = create_access_token(non_staff.id, sid=session.id)
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
 
-        response = self.client.get(reverse("security:events"))
+        endpoints = [
+            reverse("security:events"),
+            reverse("security:event-detail", kwargs={"pk": SecurityEvent.objects.first().id}),
+            reverse("security:summary"),
+            reverse("security:sessions"),
+            reverse("security:session-detail", kwargs={"pk": self.session.id}),
+        ]
 
-        self.assertEqual(response.status_code, 403)
+        for endpoint in endpoints:
+            with self.subTest(endpoint=endpoint):
+                response = self.client.get(endpoint)
+                self.assertEqual(response.status_code, 403)
+
+    def test_anonymous_user_is_denied_from_observatory_endpoints(self):
+        self.client.credentials()
+
+        endpoints = [
+            reverse("security:events"),
+            reverse("security:event-detail", kwargs={"pk": SecurityEvent.objects.first().id}),
+            reverse("security:summary"),
+            reverse("security:sessions"),
+            reverse("security:session-detail", kwargs={"pk": self.session.id}),
+        ]
+
+        for endpoint in endpoints:
+            with self.subTest(endpoint=endpoint):
+                response = self.client.get(endpoint)
+                self.assertIn(response.status_code, [401, 403])

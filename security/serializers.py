@@ -2,30 +2,33 @@
 
 from __future__ import annotations
 
-from django.utils import timezone
 from rest_framework import serializers
 
 from security.models import SecurityEvent
+from security.presentation import describe_security_event, describe_session_state
 from security.utils import humanize_code
 from user.models import AuthSession
 
 
 def _session_status_code(session: AuthSession) -> str:
-    if session.revoked_at is not None:
-        return "REVOKED"
-    if session.expires_at <= timezone.now():
-        return "EXPIRED"
-    return "ACTIVE"
+    return describe_session_state(session)["status_code"]
 
 
 def _session_status_label(session: AuthSession) -> str:
-    return humanize_code(_session_status_code(session))
+    return describe_session_state(session)["status"]
 
 
 class SecurityEventSerializer(serializers.ModelSerializer):
     event_label = serializers.SerializerMethodField()
     outcome_label = serializers.SerializerMethodField()
     severity_label = serializers.SerializerMethodField()
+    title = serializers.SerializerMethodField()
+    description = serializers.SerializerMethodField()
+    category = serializers.SerializerMethodField()
+    category_label = serializers.SerializerMethodField()
+    system_response = serializers.SerializerMethodField()
+    impact_summary = serializers.SerializerMethodField()
+    recommended_action = serializers.SerializerMethodField()
     user_email = serializers.SerializerMethodField()
     user_display_name = serializers.SerializerMethodField()
     session_user_email = serializers.SerializerMethodField()
@@ -43,6 +46,13 @@ class SecurityEventSerializer(serializers.ModelSerializer):
             "outcome_label",
             "severity",
             "severity_label",
+            "title",
+            "description",
+            "category",
+            "category_label",
+            "system_response",
+            "impact_summary",
+            "recommended_action",
             "user",
             "user_email",
             "user_display_name",
@@ -59,6 +69,16 @@ class SecurityEventSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = fields
 
+    def _presentation(self, obj):
+        cache = getattr(self, "_presentation_cache", None)
+        if cache is None:
+            cache = {}
+            self._presentation_cache = cache
+        key = str(obj.pk or id(obj))
+        if key not in cache:
+            cache[key] = describe_security_event(obj)
+        return cache[key]
+
     def get_event_label(self, obj):
         return obj.get_event_type_display()
 
@@ -66,7 +86,28 @@ class SecurityEventSerializer(serializers.ModelSerializer):
         return obj.get_outcome_display()
 
     def get_severity_label(self, obj):
-        return obj.get_severity_display()
+        return self._presentation(obj).severity_label
+
+    def get_title(self, obj):
+        return self._presentation(obj).title
+
+    def get_description(self, obj):
+        return self._presentation(obj).description
+
+    def get_category(self, obj):
+        return self._presentation(obj).category
+
+    def get_category_label(self, obj):
+        return self._presentation(obj).category_label
+
+    def get_system_response(self, obj):
+        return self._presentation(obj).system_response
+
+    def get_impact_summary(self, obj):
+        return self._presentation(obj).impact_summary
+
+    def get_recommended_action(self, obj):
+        return self._presentation(obj).recommended_action
 
     def get_user_email(self, obj):
         return obj.user.email if obj.user else None
@@ -93,6 +134,7 @@ class SecurityEventSerializer(serializers.ModelSerializer):
 class AuthSessionSerializer(serializers.ModelSerializer):
     status_code = serializers.SerializerMethodField()
     status = serializers.SerializerMethodField()
+    status_description = serializers.SerializerMethodField()
     user_email = serializers.SerializerMethodField()
     user_display_name = serializers.SerializerMethodField()
     session_display_name = serializers.SerializerMethodField()
@@ -111,6 +153,7 @@ class AuthSessionSerializer(serializers.ModelSerializer):
             "revocation_reason",
             "status_code",
             "status",
+            "status_description",
             "session_display_name",
             "authentication_method",
             "authentication_strength",
@@ -126,6 +169,9 @@ class AuthSessionSerializer(serializers.ModelSerializer):
 
     def get_status(self, obj):
         return _session_status_label(obj)
+
+    def get_status_description(self, obj):
+        return describe_session_state(obj)["status_description"]
 
     def get_user_email(self, obj):
         return obj.user.email

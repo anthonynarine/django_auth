@@ -7,6 +7,7 @@ from datetime import timedelta
 from django.utils import timezone
 
 from security.models import SecurityEvent
+from security.presentation import get_category_labels, get_severity_labels
 from user.models import AuthSession
 
 
@@ -66,6 +67,8 @@ def get_security_summary(*, window=None):
 
     return {
         "window_hours": int(window.total_seconds() // 3600),
+        "category_labels": get_category_labels(),
+        "severity_labels": get_severity_labels(),
         "successful_logins": events.filter(event_type=SecurityEvent.EventType.LOGIN_SUCCESS).count(),
         "failed_logins": events.filter(event_type=SecurityEvent.EventType.LOGIN_FAILURE).count(),
         "replay_events": events.filter(
