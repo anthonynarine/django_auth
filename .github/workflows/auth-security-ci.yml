@@ -49,6 +49,7 @@ jobs:
             user.test_middleware \
             security.test_security_events \
             security.test_security_controls \
+            security.test_operational_evidence \
             --settings=authentication.test_settings \
             -v 1
 
@@ -59,6 +60,18 @@ jobs:
       - name: Migration dry run
         run: |
           python manage.py makemigrations --check --dry-run --settings=authentication.test_settings
+
+      - name: Record CI security evidence in disposable CI database
+        run: |
+          python manage.py security_collect_evidence \
+            --environment ci \
+            --source-name auth-security-ci \
+            --source-reference "${GITHUB_WORKFLOW}:${GITHUB_JOB}:${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}:${GITHUB_SHA}" \
+            --commit-sha "${GITHUB_SHA}" \
+            --workflow "${GITHUB_WORKFLOW}" \
+            --job "${GITHUB_JOB}" \
+            --run-id "${GITHUB_RUN_ID}" \
+            --run-attempt "${GITHUB_RUN_ATTEMPT}"
 
   postgres-auth-security:
     name: PostgreSQL auth security
@@ -120,6 +133,7 @@ jobs:
             user.test_middleware \
             security.test_security_events \
             security.test_security_controls \
+            security.test_operational_evidence \
             --settings=authentication.postgres_test_settings \
             -v 1
 
@@ -130,3 +144,15 @@ jobs:
       - name: Migration dry run
         run: |
           python manage.py makemigrations --check --dry-run --settings=authentication.postgres_test_settings
+
+      - name: Record CI security evidence in disposable CI database
+        run: |
+          python manage.py security_collect_evidence \
+            --environment ci \
+            --source-name auth-security-ci \
+            --source-reference "${GITHUB_WORKFLOW}:${GITHUB_JOB}:${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}:${GITHUB_SHA}" \
+            --commit-sha "${GITHUB_SHA}" \
+            --workflow "${GITHUB_WORKFLOW}" \
+            --job "${GITHUB_JOB}" \
+            --run-id "${GITHUB_RUN_ID}" \
+            --run-attempt "${GITHUB_RUN_ATTEMPT}"
