@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from django.utils import timezone
 from rest_framework import serializers
 
-from security.models import SecurityEvent
+from security.models import SecurityControl, SecurityEvent, SecurityEvidence, SecurityFinding
 from security.presentation import describe_security_event, describe_session_state
 from security.utils import humanize_code
 from user.models import AuthSession
@@ -182,4 +183,156 @@ class AuthSessionSerializer(serializers.ModelSerializer):
 
     def get_session_display_name(self, obj):
         return f"{obj.user.email} ({self.get_status(obj)})"
+
+
+class SecurityControlSerializer(serializers.ModelSerializer):
+    domain_label = serializers.CharField(source="get_domain_display", read_only=True)
+    control_type_label = serializers.CharField(source="get_control_type_display", read_only=True)
+    status_label = serializers.CharField(source="get_status_display", read_only=True)
+    lifecycle_label = serializers.CharField(source="get_lifecycle_display", read_only=True)
+    severity_if_failed_label = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SecurityControl
+        fields = [
+            "id",
+            "control_key",
+            "domain",
+            "domain_label",
+            "title",
+            "description",
+            "control_type",
+            "control_type_label",
+            "lifecycle",
+            "lifecycle_label",
+            "status",
+            "status_label",
+            "status_reason",
+            "severity_if_failed",
+            "severity_if_failed_label",
+            "last_evaluated_at",
+            "last_evidence_at",
+            "next_review_at",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields
+
+    def get_severity_if_failed_label(self, obj):
+        return humanize_code(obj.severity_if_failed)
+
+
+class SecurityEvidenceSerializer(serializers.ModelSerializer):
+    control_key = serializers.CharField(source="control.control_key", read_only=True)
+    control_title = serializers.CharField(source="control.title", read_only=True)
+    domain = serializers.CharField(source="control.domain", read_only=True)
+    domain_label = serializers.CharField(source="control.get_domain_display", read_only=True)
+    evidence_type_label = serializers.CharField(source="get_evidence_type_display", read_only=True)
+    result_label = serializers.CharField(source="get_result_display", read_only=True)
+    is_stale = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SecurityEvidence
+        fields = [
+            "id",
+            "control",
+            "control_key",
+            "control_title",
+            "domain",
+            "domain_label",
+            "evidence_type",
+            "evidence_type_label",
+            "source_type",
+            "source_name",
+            "source_reference",
+            "title",
+            "summary",
+            "result",
+            "result_label",
+            "observed_at",
+            "valid_until",
+            "is_stale",
+            "metadata",
+            "created_at",
+        ]
+        read_only_fields = fields
+
+    def get_is_stale(self, obj):
+        return bool(obj.valid_until and obj.valid_until <= timezone.now())
+
+
+class SecurityFindingSerializer(serializers.ModelSerializer):
+    control_key = serializers.CharField(source="control.control_key", read_only=True)
+    control_title = serializers.CharField(source="control.title", read_only=True)
+    domain = serializers.CharField(source="control.domain", read_only=True)
+    domain_label = serializers.CharField(source="control.get_domain_display", read_only=True)
+    severity_label = serializers.SerializerMethodField()
+    status_label = serializers.CharField(source="get_status_display", read_only=True)
+    evidence_ids = serializers.SerializerMethodField()
+    related_event_ids = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SecurityFinding
+        fields = [
+            "id",
+            "finding_key",
+            "control",
+            "control_key",
+            "control_title",
+            "domain",
+            "domain_label",
+            "severity",
+            "severity_label",
+            "status",
+            "status_label",
+            "title",
+            "description",
+            "expected_behavior",
+            "observed_behavior",
+            "affected_system",
+            "affected_component",
+            "source_type",
+            "source_reference",
+            "first_seen_at",
+            "last_seen_at",
+            "resolved_at",
+            "resolution_summary",
+            "metadata",
+            "evidence_ids",
+            "related_event_ids",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields
+
+    def get_severity_label(self, obj):
+        return humanize_code(obj.severity)
+
+    def get_evidence_ids(self, obj):
+        return [str(evidence.id) for evidence in list(obj.evidence.all())[:20]]
+
+    def get_related_event_ids(self, obj):
+        return [str(event.id) for event in list(obj.related_events.all())[:20]]
+
+
+class SecurityControlDetailSerializer(SecurityControlSerializer):
+    recent_evidence = serializers.SerializerMethodField()
+    open_findings = serializers.SerializerMethodField()
+
+    class Meta(SecurityControlSerializer.Meta):
+        fields = SecurityControlSerializer.Meta.fields + ["recent_evidence", "open_findings"]
+
+    def get_recent_evidence(self, obj):
+        queryset = obj.evidence.order_by("-observed_at", "-created_at", "-id")[:10]
+        return SecurityEvidenceSerializer(queryset, many=True).data
+
+    def get_open_findings(self, obj):
+        queryset = obj.findings.exclude(
+            status__in=[
+                SecurityFinding.Status.RESOLVED,
+                SecurityFinding.Status.ACCEPTED_RISK,
+                SecurityFinding.Status.FALSE_POSITIVE,
+            ]
+        ).order_by("-last_seen_at", "-created_at", "-id")[:10]
+        return SecurityFindingSerializer(queryset, many=True).data
 

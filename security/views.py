@@ -10,11 +10,32 @@ from rest_framework.response import Response
 
 from user.auth_token import JWTAuthentication
 
-from .pagination import SecurityEventPagination, SecuritySessionPagination
+from .pagination import (
+    SecurityEventPagination,
+    SecurityEvidencePagination,
+    SecurityFindingPagination,
+    SecuritySessionPagination,
+)
 from .permissions import CanViewSecurityAudit
-from .selectors import get_security_summary, list_security_events, list_security_sessions
-from .serializers import AuthSessionSerializer, SecurityEventSerializer
-from security.models import SecurityEvent
+from .selectors import (
+    get_security_domains,
+    get_security_posture,
+    get_security_summary,
+    list_security_controls,
+    list_security_events,
+    list_security_evidence,
+    list_security_findings,
+    list_security_sessions,
+)
+from .serializers import (
+    AuthSessionSerializer,
+    SecurityControlDetailSerializer,
+    SecurityControlSerializer,
+    SecurityEventSerializer,
+    SecurityEvidenceSerializer,
+    SecurityFindingSerializer,
+)
+from security.models import SecurityEvent, SecurityEvidence, SecurityFinding
 
 
 def _parse_datetime(value):
@@ -85,3 +106,94 @@ class SecuritySessionDetailAPIView(generics.RetrieveAPIView):
     permission_classes = [CanViewSecurityAudit]
     serializer_class = AuthSessionSerializer
     queryset = list_security_sessions().order_by("-created_at", "-id")
+
+
+class SecurityPostureAPIView(generics.GenericAPIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [CanViewSecurityAudit]
+
+    def get(self, request, *args, **kwargs):
+        return Response(get_security_posture())
+
+
+class SecurityDomainListAPIView(generics.GenericAPIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [CanViewSecurityAudit]
+
+    def get(self, request, *args, **kwargs):
+        return Response(get_security_domains())
+
+
+class SecurityControlListAPIView(generics.ListAPIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [CanViewSecurityAudit]
+    serializer_class = SecurityControlSerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        params = self.request.query_params
+        return list_security_controls(
+            domain=params.get("domain"),
+            status=params.get("status"),
+            control_type=params.get("control_type"),
+        )
+
+
+class SecurityControlDetailAPIView(generics.RetrieveAPIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [CanViewSecurityAudit]
+    serializer_class = SecurityControlDetailSerializer
+    lookup_field = "control_key"
+    lookup_url_kwarg = "control_key"
+
+    def get_queryset(self):
+        return list_security_controls().prefetch_related("evidence", "findings")
+
+
+class SecurityEvidenceListAPIView(generics.ListAPIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [CanViewSecurityAudit]
+    serializer_class = SecurityEvidenceSerializer
+    pagination_class = SecurityEvidencePagination
+
+    def get_queryset(self):
+        params = self.request.query_params
+        return list_security_evidence(
+            control=params.get("control"),
+            evidence_type=params.get("evidence_type"),
+            result=params.get("result"),
+            source=params.get("source"),
+            observed_from=_parse_datetime(params.get("observed_from") or params.get("created_from")),
+            observed_to=_parse_datetime(params.get("observed_to") or params.get("created_to")),
+        )
+
+
+class SecurityEvidenceDetailAPIView(generics.RetrieveAPIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [CanViewSecurityAudit]
+    serializer_class = SecurityEvidenceSerializer
+    queryset = SecurityEvidence.objects.select_related("control")
+
+
+class SecurityFindingListAPIView(generics.ListAPIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [CanViewSecurityAudit]
+    serializer_class = SecurityFindingSerializer
+    pagination_class = SecurityFindingPagination
+
+    def get_queryset(self):
+        params = self.request.query_params
+        return list_security_findings(
+            status=params.get("status"),
+            severity=params.get("severity"),
+            domain=params.get("domain"),
+            control=params.get("control"),
+            affected_system=params.get("affected_system"),
+        ).prefetch_related("evidence", "related_events")
+
+
+class SecurityFindingDetailAPIView(generics.RetrieveAPIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [CanViewSecurityAudit]
+    serializer_class = SecurityFindingSerializer
+    queryset = SecurityFinding.objects.select_related("control").prefetch_related("evidence", "related_events")

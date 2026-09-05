@@ -5,3 +5,6 @@ class SecurityConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "security"
 
+    def ready(self):
+        import security.signals  # noqa: F401
+

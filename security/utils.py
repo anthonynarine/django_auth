@@ -22,6 +22,9 @@ _SENSITIVE_KEY_PARTS = (
     "cookie",
     "private_key",
     "api_key",
+    "patient",
+    "diagnosis",
+    "phi",
 )
 
 

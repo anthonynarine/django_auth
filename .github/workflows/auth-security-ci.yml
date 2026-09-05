@@ -48,6 +48,7 @@ jobs:
             user.test_a6_step_up \
             user.test_middleware \
             security.test_security_events \
+            security.test_security_controls \
             --settings=authentication.test_settings \
             -v 1
 
@@ -118,6 +119,7 @@ jobs:
             user.test_a6_step_up \
             user.test_middleware \
             security.test_security_events \
+            security.test_security_controls \
             --settings=authentication.postgres_test_settings \
             -v 1
 
